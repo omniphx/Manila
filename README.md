@@ -1,11 +1,11 @@
-# File RAG Scanner
+# Manila
 
-A pnpm monorepo containing backend, frontend, and mobile applications.
+A pnpm monorepo containing backend and frontend applications.
 
 ## Prerequisites
 
-- Node.js >= 18.0.0
-- pnpm >= 9.0.0
+- Node.js >= 22.16.0
+- pnpm >= 10.23.0
 
 ## Getting Started
 
@@ -21,31 +21,23 @@ Run all packages in development mode:
 pnpm dev
 ```
 
-## Packages
+## Apps
 
-### Backend (`packages/backend`)
+### Backend (`apps/backend`)
 
-Express-based API server.
+Express-based API server with TypeScript and Node.js.
 
 - Dev server: `pnpm --filter @manila/backend dev`
 - Build: `pnpm --filter @manila/backend build`
 - Production: `pnpm --filter @manila/backend start`
 
-### Frontend (`packages/frontend`)
+### Frontend (`apps/frontend`)
 
-React + Vite web application.
+React web application built with Vite and TypeScript.
 
 - Dev server: `pnpm --filter @manila/frontend dev`
 - Build: `pnpm --filter @manila/frontend build`
 - Preview: `pnpm --filter @manila/frontend preview`
-
-### Mobile (`packages/mobile`)
-
-React Native + Expo mobile application.
-
-- Start: `pnpm --filter @manila/mobile dev`
-- iOS: `pnpm --filter @manila/mobile ios`
-- Android: `pnpm --filter @manila/mobile android`
 
 ## Commands
 
