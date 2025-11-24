@@ -4,11 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Structure
 
-This is a pnpm monorepo with three main packages:
+This is a pnpm monorepo with two main packages:
 
-- **`packages/backend`** - Express-based API server (TypeScript, Node.js)
-- **`packages/frontend`** - React web application (Vite, TypeScript)
-- **`packages/mobile`** - React Native mobile app (Expo Router, TypeScript)
+- **`apps/backend`** - Express-based API server (TypeScript, Node.js)
+- **`apps/frontend`** - React web application (Vite, TypeScript)
 
 All packages use TypeScript and share common development tools configured at the root.
 
@@ -26,7 +25,6 @@ pnpm dev
 # Run a specific package
 pnpm --filter @manila/backend dev
 pnpm --filter @manila/frontend dev
-pnpm --filter @manila/mobile dev
 ```
 
 ### Building
@@ -60,23 +58,6 @@ pnpm lint
 pnpm --filter @manila/frontend lint
 ```
 
-### Mobile-specific commands
-
-```bash
-# Start Expo dev server
-pnpm --filter @manila/mobile dev
-
-# Run on iOS simulator
-pnpm --filter @manila/mobile ios
-
-# Run on Android emulator
-pnpm --filter @manila/mobile android
-
-# Build for production
-pnpm --filter @manila/mobile build:ios
-pnpm --filter @manila/mobile build:android
-```
-
 ### Cleaning
 
 ```bash
@@ -86,7 +67,7 @@ pnpm clean
 
 ## Architecture
 
-### Backend (`packages/backend`)
+### Backend (`apps/backend`)
 
 - **Entry point**: `src/index.ts`
 - **Build output**: `dist/`
@@ -96,7 +77,7 @@ pnpm clean
 
 The backend exposes a `/health` endpoint for health checks and runs on port 3000 by default (configurable via `PORT` env var).
 
-### Frontend (`packages/frontend`)
+### Frontend (`apps/frontend`)
 
 - **Entry point**: `src/main.tsx`
 - **Build output**: `dist/`
@@ -105,22 +86,12 @@ The backend exposes a `/health` endpoint for health checks and runs on port 3000
 
 The frontend uses React 18 with TypeScript and Vite for fast development and optimized production builds.
 
-### Mobile (`packages/mobile`)
-
-- **Entry point**: `app/_layout.tsx` (Expo Router)
-- **Navigation**: File-based routing via `app/` directory
-- **Platforms**: iOS, Android, and Web
-- **Dev tool**: Expo CLI
-
-The mobile app uses Expo Router for navigation and supports development on iOS, Android, and web platforms.
-
 ## Package Naming
 
 All packages use the scoped naming convention `@manila/<package-name>`:
 
 - `@manila/backend`
 - `@manila/frontend`
-- `@manila/mobile`
 
 ## Workspace Management
 
@@ -128,6 +99,7 @@ This project uses pnpm workspaces. The workspace configuration is in `pnpm-works
 
 ```yaml
 packages:
+  - "apps/*"
   - "packages/*"
 ```
 
