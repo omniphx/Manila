@@ -1,5 +1,7 @@
 import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Platform, StyleSheet, TouchableOpacity } from 'react-native';
+import { useAuth, useUser } from '@clerk/clerk-expo';
+import { useRouter } from 'expo-router';
 
 import { HelloWave } from '@/components/hello-wave';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
@@ -8,6 +10,19 @@ import { ThemedView } from '@/components/themed-view';
 import { Link } from 'expo-router';
 
 export default function HomeScreen() {
+  const { isSignedIn, signOut } = useAuth();
+  const { user } = useUser();
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      router.replace('/(auth)/sign-in');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
@@ -18,9 +33,39 @@ export default function HomeScreen() {
         />
       }>
       <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
+        <ThemedText type="title">
+          {isSignedIn ? `Welcome, ${user?.firstName || user?.emailAddresses[0]?.emailAddress}!` : 'Welcome!'}
+        </ThemedText>
         <HelloWave />
       </ThemedView>
+
+      <ThemedView style={styles.stepContainer}>
+        <ThemedText type="subtitle">Authentication Status</ThemedText>
+        {isSignedIn ? (
+          <>
+            <ThemedText>
+              You are signed in as{' '}
+              <ThemedText type="defaultSemiBold">
+                {user?.emailAddresses[0]?.emailAddress}
+              </ThemedText>
+            </ThemedText>
+            <TouchableOpacity style={styles.button} onPress={handleSignOut}>
+              <ThemedText style={styles.buttonText}>Sign Out</ThemedText>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <ThemedText>You are not signed in.</ThemedText>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => router.push('/(auth)/sign-in')}
+            >
+              <ThemedText style={styles.buttonText}>Sign In</ThemedText>
+            </TouchableOpacity>
+          </>
+        )}
+      </ThemedView>
+
       <ThemedView style={styles.stepContainer}>
         <ThemedText type="subtitle">Step 1: Try it</ThemedText>
         <ThemedText>
@@ -94,5 +139,17 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     position: 'absolute',
+  },
+  button: {
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
