@@ -7,9 +7,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is a pnpm monorepo with two main packages:
 
 - **`apps/backend`** - Express-based API server (TypeScript, Node.js)
-- **`apps/frontend`** - React web application (Vite, TypeScript)
+- **`apps/frontend`** - Next.js web application (TypeScript, React)
 
 All packages use TypeScript and share common development tools configured at the root.
+
+## Getting Started
+
+### Initial Setup
+
+```bash
+# Install all dependencies
+pnpm install
+```
+
+### Environment Variables (Vercel)
+
+The frontend app is deployed to Vercel and uses Clerk for authentication. To run the app locally, you need to pull environment variables from Vercel:
+
+```bash
+# Login to Vercel (if not already logged in)
+npx vercel login
+
+# Navigate to the frontend app
+cd apps/frontend
+
+# Pull environment variables from Vercel
+npx vercel env pull .env.development.local
+```
+
+This will create a `.env.development.local` file with the necessary environment variables (Clerk keys, etc.) for local development.
+
+**Note:** The `.env.development.local` file contains secrets and should not be committed to version control. It's already in `.gitignore`.
 
 ## Development Commands
 
@@ -79,12 +107,15 @@ The backend exposes a `/health` endpoint for health checks and runs on port 3000
 
 ### Frontend (`apps/frontend`)
 
-- **Entry point**: `src/main.tsx`
-- **Build output**: `dist/`
-- **Dev server**: Vite (port 5173)
-- **API proxy**: `/api` routes proxy to `http://localhost:3000` during development
+- **Entry point**: `app/` (Next.js App Router)
+- **Build output**: `.next/`
+- **Dev server**: Next.js with Turbopack (port 3000 by default)
+- **Framework**: Next.js 16 with React 19 and TypeScript
+- **Authentication**: Clerk (via `@clerk/nextjs`)
+- **Styling**: Tailwind CSS v4
+- **Deployment**: Vercel
 
-The frontend uses React 18 with TypeScript and Vite for fast development and optimized production builds.
+The frontend uses Next.js App Router with Server Components, providing fast development with Turbopack and optimized production builds. Authentication is handled by Clerk.
 
 ## Package Naming
 
