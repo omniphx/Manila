@@ -27,25 +27,25 @@ pnpm dev
 
 Express-based API server.
 
-- Dev server: `pnpm --filter @file-rag-scanner/backend dev`
-- Build: `pnpm --filter @file-rag-scanner/backend build`
-- Production: `pnpm --filter @file-rag-scanner/backend start`
+- Dev server: `pnpm --filter @manila/backend dev`
+- Build: `pnpm --filter @manila/backend build`
+- Production: `pnpm --filter @manila/backend start`
 
 ### Frontend (`packages/frontend`)
 
 React + Vite web application.
 
-- Dev server: `pnpm --filter @file-rag-scanner/frontend dev`
-- Build: `pnpm --filter @file-rag-scanner/frontend build`
-- Preview: `pnpm --filter @file-rag-scanner/frontend preview`
+- Dev server: `pnpm --filter @manila/frontend dev`
+- Build: `pnpm --filter @manila/frontend build`
+- Preview: `pnpm --filter @manila/frontend preview`
 
 ### Mobile (`packages/mobile`)
 
 React Native + Expo mobile application.
 
-- Start: `pnpm --filter @file-rag-scanner/mobile dev`
-- iOS: `pnpm --filter @file-rag-scanner/mobile ios`
-- Android: `pnpm --filter @file-rag-scanner/mobile android`
+- Start: `pnpm --filter @manila/mobile dev`
+- iOS: `pnpm --filter @manila/mobile ios`
+- Android: `pnpm --filter @manila/mobile android`
 
 ## Commands
 

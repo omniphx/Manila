@@ -38,16 +38,19 @@ A production-ready backend API built with Fastify, tRPC v11, PostgreSQL with pgv
 ### Option 1: Using Docker Compose (Recommended)
 
 1. Install dependencies:
+
 ```bash
 pnpm install
 ```
 
 2. Start the services:
+
 ```bash
 docker-compose up
 ```
 
 This will:
+
 - Start PostgreSQL with pgvector extension
 - Run database migrations
 - Start the backend server with hot-reloading
@@ -57,11 +60,13 @@ The backend will be available at `http://localhost:3000`
 ### Option 2: Local Development
 
 1. Install dependencies:
+
 ```bash
 pnpm install
 ```
 
 2. Set up environment variables:
+
 ```bash
 cp .env.example .env.development
 ```
@@ -69,6 +74,7 @@ cp .env.example .env.development
 Edit `.env.development` with your database credentials.
 
 3. Start PostgreSQL (ensure pgvector extension is installed):
+
 ```bash
 # If using Docker for just the database:
 docker run -d \
@@ -81,11 +87,13 @@ docker run -d \
 ```
 
 4. Push the database schema:
+
 ```bash
 pnpm db:push
 ```
 
 5. Start the development server:
+
 ```bash
 pnpm dev
 ```
@@ -106,6 +114,7 @@ pnpm dev
 ## Database Schema
 
 ### Users Table
+
 - `id` (UUID, Primary Key)
 - `email` (String, Unique)
 - `password_hash` (String)
@@ -114,6 +123,7 @@ pnpm dev
 - `updated_at` (Timestamp)
 
 ### Refresh Tokens Table
+
 - `id` (UUID, Primary Key)
 - `user_id` (UUID, Foreign Key → Users)
 - `token` (String, Unique)
@@ -121,6 +131,7 @@ pnpm dev
 - `created_at` (Timestamp)
 
 ### Embeddings Table
+
 - `id` (UUID, Primary Key)
 - `user_id` (UUID, Foreign Key → Users)
 - `content` (Text)
@@ -134,9 +145,11 @@ pnpm dev
 ### Health Check
 
 #### GET /health
+
 Returns server health status.
 
 **Response:**
+
 ```json
 {
   "status": "ok",
@@ -150,14 +163,17 @@ Returns server health status.
 All tRPC endpoints are available at `/trpc/*`
 
 #### health.hello
+
 Hello world endpoint.
 
 **Input:**
+
 ```typescript
 { name?: string }
 ```
 
 **Output:**
+
 ```typescript
 {
   message: string,
@@ -166,9 +182,11 @@ Hello world endpoint.
 ```
 
 #### health.status
+
 Server status endpoint.
 
 **Output:**
+
 ```typescript
 {
   status: "ok",
@@ -178,9 +196,11 @@ Server status endpoint.
 ```
 
 #### auth.register
+
 Register a new user.
 
 **Input:**
+
 ```typescript
 {
   email: string,
@@ -190,6 +210,7 @@ Register a new user.
 ```
 
 **Output:**
+
 ```typescript
 {
   user: {
@@ -203,9 +224,11 @@ Register a new user.
 ```
 
 #### auth.login
+
 Login with email and password.
 
 **Input:**
+
 ```typescript
 {
   email: string,
@@ -214,6 +237,7 @@ Login with email and password.
 ```
 
 **Output:**
+
 ```typescript
 {
   user: {
@@ -227,16 +251,19 @@ Login with email and password.
 ```
 
 #### auth.refresh
+
 Refresh access token using refresh token.
 
 **Input:**
+
 ```typescript
 {
-  refreshToken: string
+  refreshToken: string;
 }
 ```
 
 **Output:**
+
 ```typescript
 {
   accessToken: string,
@@ -245,14 +272,17 @@ Refresh access token using refresh token.
 ```
 
 #### auth.me (Protected)
+
 Get current user information.
 
 **Headers:**
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **Output:**
+
 ```typescript
 {
   id: string,
@@ -262,14 +292,17 @@ Authorization: Bearer <access_token>
 ```
 
 #### embeddings.create (Protected)
+
 Create a new embedding.
 
 **Headers:**
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **Input:**
+
 ```typescript
 {
   content: string,
@@ -279,6 +312,7 @@ Authorization: Bearer <access_token>
 ```
 
 **Output:**
+
 ```typescript
 {
   id: string,
@@ -289,14 +323,17 @@ Authorization: Bearer <access_token>
 ```
 
 #### embeddings.search (Protected)
+
 Search embeddings by vector similarity.
 
 **Headers:**
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **Input:**
+
 ```typescript
 {
   embedding: number[], // Array of 1536 numbers
@@ -306,32 +343,37 @@ Authorization: Bearer <access_token>
 ```
 
 **Output:**
+
 ```typescript
 Array<{
-  id: string,
-  content: string,
-  metadata?: string,
-  createdAt: Date,
-  similarity: number
-}>
+  id: string;
+  content: string;
+  metadata?: string;
+  createdAt: Date;
+  similarity: number;
+}>;
 ```
 
 #### embeddings.getById (Protected)
+
 Get embedding by ID.
 
 **Headers:**
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **Input:**
+
 ```typescript
 {
-  id: string
+  id: string;
 }
 ```
 
 **Output:**
+
 ```typescript
 {
   id: string,
@@ -342,14 +384,17 @@ Authorization: Bearer <access_token>
 ```
 
 #### embeddings.list (Protected)
+
 List user's embeddings with pagination.
 
 **Headers:**
+
 ```
 Authorization: Bearer <access_token>
 ```
 
 **Input:**
+
 ```typescript
 {
   limit?: number, // Default: 20, Max: 100
@@ -358,13 +403,14 @@ Authorization: Bearer <access_token>
 ```
 
 **Output:**
+
 ```typescript
 Array<{
-  id: string,
-  content: string,
-  metadata?: string,
-  createdAt: Date
-}>
+  id: string;
+  content: string;
+  metadata?: string;
+  createdAt: Date;
+}>;
 ```
 
 ## Using the tRPC Client
@@ -372,15 +418,15 @@ Array<{
 ### TypeScript Client Setup
 
 ```typescript
-import { createTRPCClient, httpBatchLink } from '@trpc/client';
-import type { AppRouter } from '@file-rag-scanner/backend';
+import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import type { AppRouter } from "@manila/backend";
 
 const client = createTRPCClient<AppRouter>({
   links: [
     httpBatchLink({
-      url: 'http://localhost:3000/trpc',
+      url: "http://localhost:3000/trpc",
       headers() {
-        const token = localStorage.getItem('accessToken');
+        const token = localStorage.getItem("accessToken");
         return token ? { authorization: `Bearer ${token}` } : {};
       },
     }),
@@ -389,16 +435,16 @@ const client = createTRPCClient<AppRouter>({
 
 // Usage
 const result = await client.auth.login.mutate({
-  email: 'user@example.com',
-  password: 'password123',
+  email: "user@example.com",
+  password: "password123",
 });
 ```
 
 ### React Client Setup
 
 ```typescript
-import { createTRPCReact, httpBatchLink } from '@trpc/react-query';
-import type { AppRouter } from '@file-rag-scanner/backend';
+import { createTRPCReact, httpBatchLink } from "@trpc/react-query";
+import type { AppRouter } from "@manila/backend";
 
 export const trpc = createTRPCReact<AppRouter>();
 
@@ -406,9 +452,9 @@ export const trpc = createTRPCReact<AppRouter>();
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: 'http://localhost:3000/trpc',
+      url: "http://localhost:3000/trpc",
       headers() {
-        const token = localStorage.getItem('accessToken');
+        const token = localStorage.getItem("accessToken");
         return token ? { authorization: `Bearer ${token}` } : {};
       },
     }),
@@ -468,6 +514,7 @@ pnpm test:ui
 ```
 
 The test suite includes:
+
 - Authentication flow tests (register, login, refresh)
 - Password hashing and verification tests
 - JWT token generation and verification tests

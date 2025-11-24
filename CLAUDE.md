@@ -24,9 +24,9 @@ pnpm install
 pnpm dev
 
 # Run a specific package
-pnpm --filter @file-rag-scanner/backend dev
-pnpm --filter @file-rag-scanner/frontend dev
-pnpm --filter @file-rag-scanner/mobile dev
+pnpm --filter @manila/backend dev
+pnpm --filter @manila/frontend dev
+pnpm --filter @manila/mobile dev
 ```
 
 ### Building
@@ -36,8 +36,8 @@ pnpm --filter @file-rag-scanner/mobile dev
 pnpm build
 
 # Build a specific package
-pnpm --filter @file-rag-scanner/backend build
-pnpm --filter @file-rag-scanner/frontend build
+pnpm --filter @manila/backend build
+pnpm --filter @manila/frontend build
 ```
 
 ### Testing
@@ -47,7 +47,7 @@ pnpm --filter @file-rag-scanner/frontend build
 pnpm test
 
 # Run tests for a specific package
-pnpm --filter @file-rag-scanner/backend test
+pnpm --filter @manila/backend test
 ```
 
 ### Linting
@@ -57,24 +57,24 @@ pnpm --filter @file-rag-scanner/backend test
 pnpm lint
 
 # Lint a specific package
-pnpm --filter @file-rag-scanner/frontend lint
+pnpm --filter @manila/frontend lint
 ```
 
 ### Mobile-specific commands
 
 ```bash
 # Start Expo dev server
-pnpm --filter @file-rag-scanner/mobile dev
+pnpm --filter @manila/mobile dev
 
 # Run on iOS simulator
-pnpm --filter @file-rag-scanner/mobile ios
+pnpm --filter @manila/mobile ios
 
 # Run on Android emulator
-pnpm --filter @file-rag-scanner/mobile android
+pnpm --filter @manila/mobile android
 
 # Build for production
-pnpm --filter @file-rag-scanner/mobile build:ios
-pnpm --filter @file-rag-scanner/mobile build:android
+pnpm --filter @manila/mobile build:ios
+pnpm --filter @manila/mobile build:android
 ```
 
 ### Cleaning
@@ -116,10 +116,11 @@ The mobile app uses Expo Router for navigation and supports development on iOS, 
 
 ## Package Naming
 
-All packages use the scoped naming convention `@file-rag-scanner/<package-name>`:
-- `@file-rag-scanner/backend`
-- `@file-rag-scanner/frontend`
-- `@file-rag-scanner/mobile`
+All packages use the scoped naming convention `@manila/<package-name>`:
+
+- `@manila/backend`
+- `@manila/frontend`
+- `@manila/mobile`
 
 ## Workspace Management
 
@@ -127,12 +128,13 @@ This project uses pnpm workspaces. The workspace configuration is in `pnpm-works
 
 ```yaml
 packages:
-  - 'packages/*'
+  - "packages/*"
 ```
 
 When adding dependencies:
+
 - Use `pnpm add <package>` in the root to add shared dependencies
-- Use `pnpm add <package> --filter @file-rag-scanner/<package-name>` to add dependencies to a specific package
+- Use `pnpm add <package> --filter @manila/<package-name>` to add dependencies to a specific package
 - Workspace packages can reference each other using `workspace:*` protocol
 
 ## TypeScript Configuration

@@ -1,5 +1,5 @@
 {
-  "name": "@file-rag-scanner/frontend",
+  "name": "@manila/frontend",
   "version": "0.1.0",
   "private": true,
   "scripts": {
