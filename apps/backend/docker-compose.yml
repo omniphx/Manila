@@ -41,8 +41,6 @@ services:
         condition: service_healthy
     volumes:
       - ${VOLUME_MOUNT:-.:/app}
-      - /app/node_modules
-      - /app/.pnpm-store
     command: ${DOCKER_COMMAND:-sh -c "pnpm install && pnpm dev"}
     restart: unless-stopped
 

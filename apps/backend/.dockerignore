@@ -2,13 +2,9 @@
 node_modules/
 .pnpm-store/
 
-# Build output
-dist/
-
 # Environment variables
 .env
 .env.local
-.env.production
 .env.*.local
 
 # Logs
@@ -28,3 +24,12 @@ coverage/
 # OS
 .DS_Store
 Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
