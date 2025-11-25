@@ -14,7 +14,12 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "docker:dev": "cp .env.development .env && docker compose up --build",
+    "docker:prod": "cp .env.production .env && docker compose up --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:clean": "docker compose down -v"
   },
   "dependencies": {
     "@clerk/fastify": "^2.6.5",
