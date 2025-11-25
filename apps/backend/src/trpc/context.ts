@@ -18,12 +18,12 @@ export async function createContext({
   req: FastifyRequest;
   res: FastifyReply;
 }): Promise<Context> {
-  const auth = getAuth(req);
+  const auth = getAuth(req as any);
   let user = null;
 
-  if (auth.userId) {
+  if ('userId' in auth && auth.userId) {
     user = {
-      userId: auth.userId,
+      userId: auth.userId as string,
     };
   }
 

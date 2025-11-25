@@ -46,7 +46,7 @@ async function main() {
       timeWindow: env.RATE_LIMIT_TIME_WINDOW,
     });
 
-    await server.register(clerkPlugin, {
+    await server.register(clerkPlugin as any, {
       publishableKey: env.CLERK_PUBLISHABLE_KEY,
       secretKey: env.CLERK_SECRET_KEY,
     });
@@ -62,7 +62,7 @@ async function main() {
       } satisfies FastifyTRPCPluginOptions<AppRouter>["trpcOptions"],
     });
 
-    server.get("/", async (request, reply) => {
+    server.get("/", async () => {
       return {
         name: "File RAG Scanner API",
         version: "0.0.0",
@@ -74,7 +74,7 @@ async function main() {
       };
     });
 
-    server.get("/health", async (request, reply) => {
+    server.get("/health", async () => {
       return {
         status: "ok",
         timestamp: new Date().toISOString(),
@@ -82,7 +82,7 @@ async function main() {
       };
     });
 
-    server.setErrorHandler((error, request, reply) => {
+    server.setErrorHandler((error, _request, reply) => {
       server.log.error(error);
       reply.status(error.statusCode || 500).send({
         error: {
