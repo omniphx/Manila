@@ -1,39 +1,43 @@
-import Fastify from 'fastify';
-import cors from '@fastify/cors';
-import helmet from '@fastify/helmet';
-import rateLimit from '@fastify/rate-limit';
-import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
-import { env } from './lib/env.js';
-import { appRouter } from './trpc/router.js';
-import { createContext } from './trpc/context.js';
+import { clerkPlugin } from "@clerk/fastify";
+import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
+import rateLimit from "@fastify/rate-limit";
+import {
+  fastifyTRPCPlugin,
+  FastifyTRPCPluginOptions,
+} from "@trpc/server/adapters/fastify";
+import Fastify from "fastify";
+import { env } from "./lib/env.js";
+import { createContext } from "./trpc/context.js";
+import { appRouter, type AppRouter } from "./trpc/router.js";
 
 const server = Fastify({
   logger: {
-    level: env.NODE_ENV === 'production' ? 'info' : 'debug',
+    level: env.NODE_ENV === "production" ? "info" : "debug",
     transport:
-      env.NODE_ENV === 'development'
+      env.NODE_ENV === "development"
         ? {
-            target: 'pino-pretty',
+            target: "pino-pretty",
             options: {
               colorize: true,
-              translateTime: 'HH:MM:ss Z',
-              ignore: 'pid,hostname',
+              translateTime: "HH:MM:ss Z",
+              ignore: "pid,hostname",
             },
           }
         : undefined,
   },
   disableRequestLogging: false,
-  requestIdLogLabel: 'reqId',
+  requestIdLogLabel: "reqId",
 });
 
 async function main() {
   try {
     await server.register(helmet, {
-      contentSecurityPolicy: env.NODE_ENV === 'production' ? undefined : false,
+      contentSecurityPolicy: env.NODE_ENV === "production" ? undefined : false,
     });
 
     await server.register(cors, {
-      origin: env.CORS_ORIGIN.split(',').map((origin) => origin.trim()),
+      origin: env.CORS_ORIGIN.split(",").map((origin) => origin.trim()),
       credentials: true,
     });
 
@@ -42,32 +46,37 @@ async function main() {
       timeWindow: env.RATE_LIMIT_TIME_WINDOW,
     });
 
+    await server.register(clerkPlugin, {
+      publishableKey: env.CLERK_PUBLISHABLE_KEY,
+      secretKey: env.CLERK_SECRET_KEY,
+    });
+
     await server.register(fastifyTRPCPlugin, {
-      prefix: '/trpc',
+      prefix: "/trpc",
       trpcOptions: {
         router: appRouter,
         createContext,
         onError({ path, error }) {
-          server.log.error(`Error in tRPC handler on path '${path}':`, error);
+          server.log.error({ err: error, path }, `Error in tRPC handler on path '${path}'`);
         },
-      },
+      } satisfies FastifyTRPCPluginOptions<AppRouter>["trpcOptions"],
     });
 
-    server.get('/', async (request, reply) => {
+    server.get("/", async (request, reply) => {
       return {
-        name: 'File RAG Scanner API',
-        version: '0.0.0',
+        name: "File RAG Scanner API",
+        version: "0.0.0",
         endpoints: {
-          health: '/health',
-          trpc: '/trpc',
+          health: "/health",
+          trpc: "/trpc",
         },
-        documentation: 'See README.md for API documentation',
+        documentation: "See README.md for API documentation",
       };
     });
 
-    server.get('/health', async (request, reply) => {
+    server.get("/health", async (request, reply) => {
       return {
-        status: 'ok',
+        status: "ok",
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
       };
@@ -77,7 +86,7 @@ async function main() {
       server.log.error(error);
       reply.status(error.statusCode || 500).send({
         error: {
-          message: error.message || 'Internal Server Error',
+          message: error.message || "Internal Server Error",
           statusCode: error.statusCode || 500,
         },
       });

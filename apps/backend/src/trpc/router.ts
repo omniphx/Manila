@@ -1,11 +1,9 @@
-import { router } from './trpc.js';
-import { healthRouter } from './routers/health.js';
-import { authRouter } from './routers/auth.js';
-import { embeddingsRouter } from './routers/embeddings.js';
+import { embeddingsRouter } from "./routers/embeddings.js";
+import { healthRouter } from "./routers/health.js";
+import { router } from "./trpc.js";
 
 export const appRouter = router({
   health: healthRouter,
-  auth: authRouter,
   embeddings: embeddingsRouter,
 });
 
