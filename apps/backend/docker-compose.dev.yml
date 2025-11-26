@@ -5,7 +5,13 @@
 version: "3.8"
 
 services:
+  postgres:
+    env_file:
+      - .env.development
+
   backend:
+    env_file:
+      - .env.development
     # Mount local code for hot-reloading in development
     volumes:
       - ../..:/app

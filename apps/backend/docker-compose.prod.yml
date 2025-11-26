@@ -5,7 +5,15 @@
 version: "3.8"
 
 services:
+  postgres:
+    env_file:
+      - .env.production
+
   backend:
+    env_file:
+      - .env.production
     # No volumes in production - use the built image
-    # Production settings are primarily controlled via .env.production
+    # Override the base command to use the Dockerfile's production CMD
+    # This overrides the dev default from docker-compose.yml
+    command: ["node", "apps/backend/dist/index.js"]
     restart: always

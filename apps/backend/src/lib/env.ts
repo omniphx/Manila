@@ -1,7 +1,9 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
 
-const envFile = process.env.NODE_ENV === 'production' ? '.env' : '.env.development';
+// Load environment variables from file
+// In Docker, env_file in docker-compose handles this, but for local development we need dotenv
+const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env.development';
 dotenv.config({ path: envFile });
 
 const envSchema = z.object({
