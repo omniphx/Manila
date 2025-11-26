@@ -16,7 +16,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "docker:dev": "cp .env.development .env && docker compose up --build",
-    "docker:prod": "cp .env.production .env && docker compose up --build",
+    "docker:prod": "cp .env.production .env && DOCKER_TARGET=production DOCKER_COMMAND='node dist/index.js' docker compose up --build",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
     "docker:clean": "docker compose down -v"

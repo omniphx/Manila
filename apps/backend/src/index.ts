@@ -82,7 +82,7 @@ async function main() {
       };
     });
 
-    server.setErrorHandler((error, _request, reply) => {
+    server.setErrorHandler((error: any, _request, reply) => {
       server.log.error(error);
       reply.status(error.statusCode || 500).send({
         error: {
