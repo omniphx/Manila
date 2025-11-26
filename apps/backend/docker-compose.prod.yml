@@ -1,0 +1,11 @@
+# Production-specific Docker Compose configuration
+# This file extends docker-compose.yml with production settings
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up
+
+version: "3.8"
+
+services:
+  backend:
+    # No volumes in production - use the built image
+    # Production settings are primarily controlled via .env.production
+    restart: always

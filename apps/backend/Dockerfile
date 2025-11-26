@@ -20,9 +20,15 @@ CMD ["pnpm", "dev"]
 
 # Stage 4: Build
 FROM base AS build
-COPY package.json pnpm-lock.yaml* ./
+# Copy workspace configuration
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Copy all package.json files for workspace resolution
+COPY apps/backend/package.json ./apps/backend/package.json
+# Install dependencies
 RUN pnpm install
-COPY . .
+# Copy source code
+COPY apps/backend ./apps/backend
+# Build the backend
 RUN pnpm --filter @manila/backend build
 
 # Stage 5: Production

@@ -86,6 +86,11 @@ git config --global user.email "<deploy@manila.app>"
 - once completed test out the connection with `ssh -T git@github.com`
 - clone the repo: `git clone --depth 1 --branch main git@github.com:omniphx/manila.git /opt/manila`
 
+11 Node, pnpm
+
+- Install Node.js v22
+- Through node, enable corepack and install pnpm
+
 10 Testing Checklist
 
 - Test firewall: sudo ufw status verbose
@@ -112,9 +117,9 @@ chsh -s $(which zsh)
 
 DROPLET INFORMATION:
 
-- Droplet IP: [request if not provided already]
+- Droplet IP: 104.248.66.216
 - OS: Ubuntu 24.04 (LTS) x64
-- Current access: root@[request if not provided already]
+- Current access: root@104.248.66.216
 
 After completion, I should be able to SSH in as either user. Do not make any code changes.
 

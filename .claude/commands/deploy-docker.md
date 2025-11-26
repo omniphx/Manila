@@ -8,13 +8,13 @@ DROPLET INFORMATION:
 
 Steps:
 
-1. SSH as: agent@[YOUR_DROPLET_IP]
+1. SSH as: agent@104.248.66.216
 2. cd /opt/manila
 3. git pull origin main
 4. Navigate to backend folder: apps/backend
-5. docker compose down
-6. docker compose up -d --build
+5. pnpm docker:down
+6. pnpm docker:prod
 7. docker compose ps (verify all containers are running)
 8. docker compose logs -f (check for errors)
 
-If anything fails, report the error and ask the user for next steps.
+If anything fails, report the error and ask the user for next steps. Do not try to fix the error or make code changes.

@@ -1,0 +1,11 @@
+# Development-specific Docker Compose configuration
+# This file extends docker-compose.yml with development settings
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+version: "3.8"
+
+services:
+  backend:
+    # Mount local code for hot-reloading in development
+    volumes:
+      - ../..:/app

@@ -39,8 +39,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    volumes:
-      - ${VOLUME_MOUNT:-../..:/app}
     command: ${DOCKER_COMMAND:-sh -c "pnpm install && pnpm dev"}
     restart: unless-stopped
 
