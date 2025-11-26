@@ -25,7 +25,7 @@ services:
     build:
       context: ../..
       dockerfile: apps/backend/Dockerfile
-      target: ${DOCKER_TARGET:-dev}
+      target: dev
     container_name: manila-backend
     env_file:
       - .env
@@ -39,7 +39,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: ${DOCKER_COMMAND:-sh -c "pnpm install && pnpm dev"}
+    command: sh -c "pnpm install && pnpm dev"
     restart: unless-stopped
 
 volumes:

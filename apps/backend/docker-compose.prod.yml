@@ -10,6 +10,8 @@ services:
       - .env.production
 
   backend:
+    build:
+      target: production
     env_file:
       - .env.production
     # No volumes in production - use the built image
