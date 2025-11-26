@@ -35,7 +35,6 @@ pnpm-debug.log*
 .expo-shared/
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
