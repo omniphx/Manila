@@ -16,7 +16,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "docker:dev": "cp .env.development .env && docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build",
-    "docker:prod:build": "cp .env.production .env && docker compose -f docker-compose.yml -f docker-compose.prod.yml build --no-cache",
+    "docker:prod:build": "cp .env.production .env && docker compose -f docker-compose.yml -f docker-compose.prod.yml build",
     "docker:prod:up": "docker compose -f docker-compose.yml -f docker-compose.prod.yml up",
     "docker:prod": "pnpm docker:prod:build && pnpm docker:prod:up",
     "docker:down": "docker compose down",
