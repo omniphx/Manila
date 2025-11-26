@@ -19,7 +19,9 @@
     "docker:prod:build": "docker compose -f docker-compose.yml -f docker-compose.prod.yml build",
     "docker:prod:build:fresh": "docker compose -f docker-compose.yml -f docker-compose.prod.yml build --no-cache",
     "docker:prod:up": "docker compose -f docker-compose.yml -f docker-compose.prod.yml up",
-    "docker:prod": "pnpm docker:prod:build && pnpm docker:prod:up",
+    "docker:prod": "pnpm docker:prod:build && pnpm docker:prod:up -d",
+    "docker:prod:logs": "docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f",
+    "docker:prod:status": "docker compose -f docker-compose.yml -f docker-compose.prod.yml ps",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
     "docker:clean": "docker compose down -v"
