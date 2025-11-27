@@ -2,38 +2,62 @@
 
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import { useState } from "react";
+import { uploadFile } from "../actions/upload";
 
 export function FileUpload() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string>("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string>("");
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       setSelectedFile(file);
       setUploadStatus("");
+      setError("");
     }
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!selectedFile) {
-      setUploadStatus("Please select a file first");
+      setError("Please select a file first");
       return;
     }
 
-    // For now, just show success message since no backend integration
-    setUploadStatus(`File "${selectedFile.name}" ready to upload (${(selectedFile.size / 1024).toFixed(2)} KB)`);
+    setIsUploading(true);
+    setError("");
+    setUploadStatus("");
 
-    // Reset after 3 seconds
-    setTimeout(() => {
-      setUploadStatus("");
-      setSelectedFile(null);
-      // Reset the file input
-      const fileInput = document.getElementById("file-input") as HTMLInputElement;
-      if (fileInput) fileInput.value = "";
-    }, 3000);
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      // Call server action
+      const result = await uploadFile(formData);
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      setUploadStatus(`File "${result.data.originalFilename}" uploaded successfully!`);
+
+      // Reset after 3 seconds
+      setTimeout(() => {
+        setUploadStatus("");
+        setSelectedFile(null);
+        setError("");
+        const fileInput = document.getElementById("file-input") as HTMLInputElement;
+        if (fileInput) fileInput.value = "";
+      }, 3000);
+    } catch (err) {
+      console.error("Upload error:", err);
+      setError(err instanceof Error ? err.message : "Failed to upload file");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -78,18 +102,26 @@ export function FileUpload() {
 
           <button
             type="submit"
-            disabled={!selectedFile}
+            disabled={!selectedFile || isUploading}
             className="w-full bg-[#6c47ff] text-white rounded-full font-medium text-sm h-10 px-5
               hover:bg-[#5a3ad6] transition-colors
               disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Submit
+            {isUploading ? "Uploading..." : "Submit"}
           </button>
 
           {uploadStatus && (
             <div className="mt-2 p-3 rounded-md bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
               <p className="text-sm text-green-800 dark:text-green-200">
                 {uploadStatus}
+              </p>
+            </div>
+          )}
+
+          {error && (
+            <div className="mt-2 p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+              <p className="text-sm text-red-800 dark:text-red-200">
+                {error}
               </p>
             </div>
           )}

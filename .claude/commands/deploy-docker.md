@@ -16,5 +16,6 @@ Steps:
 6. pnpm docker:prod
 7. docker compose ps (verify all containers are running)
 8. docker compose logs -f (check for errors)
+9. pnpm db:migrate
 
 If anything fails, report the error and ask the user for next steps. Do not try to fix the error or make code changes.

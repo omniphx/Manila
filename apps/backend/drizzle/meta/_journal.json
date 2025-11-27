@@ -8,6 +8,20 @@
       "when": 1764273223394,
       "tag": "0000_nosy_ultimatum",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1764276770986,
+      "tag": "0001_real_squadron_sinister",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1764276843917,
+      "tag": "0002_late_tenebrous",
+      "breakpoints": true
     }
   ]
 }
