@@ -16,6 +16,7 @@ import { db } from "./lib/db.js";
 import { files } from "./db/schema.js";
 import { createContext } from "./trpc/context.js";
 import { appRouter, type AppRouter } from "./trpc/router.js";
+import { sql } from "drizzle-orm";
 
 const UPLOAD_DIR = join(process.cwd(), 'uploads');
 
@@ -77,6 +78,55 @@ async function main() {
           server.log.error({ err: error, path }, `Error in tRPC handler on path '${path}'`);
         },
       } satisfies FastifyTRPCPluginOptions<AppRouter>["trpcOptions"],
+    });
+
+    // File download endpoint
+    server.get("/files/:id", async (request, reply) => {
+      try {
+        const { id } = request.params as { id: string };
+
+        // Check authentication
+        const auth = getAuth(request as any);
+        if (!auth.userId) {
+          return reply.code(401).send({
+            error: {
+              message: "Unauthorized",
+              statusCode: 401,
+            },
+          });
+        }
+
+        // Get file from database
+        const [file] = await db
+          .select()
+          .from(files)
+          .where(sql`${files.id} = ${id}`)
+          .limit(1);
+
+        if (!file || file.userId !== auth.userId) {
+          return reply.code(404).send({
+            error: {
+              message: "File not found",
+              statusCode: 404,
+            },
+          });
+        }
+
+        // Read and send file
+        const fileBuffer = await fs.readFile(file.path);
+        return reply
+          .header('Content-Type', file.mimeType)
+          .header('Content-Disposition', `attachment; filename="${file.originalFilename}"`)
+          .send(fileBuffer);
+      } catch (error) {
+        server.log.error(error);
+        return reply.code(500).send({
+          error: {
+            message: "Failed to download file",
+            statusCode: 500,
+          },
+        });
+      }
     });
 
     // File upload endpoint

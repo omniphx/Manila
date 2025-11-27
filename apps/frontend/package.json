@@ -11,6 +11,11 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^6.35.4",
+    "@manila/backend": "workspace:*",
+    "@tanstack/react-query": "^5.90.11",
+    "@trpc/client": "^11.7.2",
+    "@trpc/react-query": "^11.7.2",
+    "@trpc/server": "^11.7.2",
     "next": "16.0.3",
     "react": "19.2.0",
     "react-dom": "19.2.0"
