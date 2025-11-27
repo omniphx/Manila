@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { BackendStatus } from "./components/BackendStatus";
+import { FileUpload } from "./components/FileUpload";
 
 export default function Home() {
   return (
@@ -26,6 +27,10 @@ export default function Home() {
 
           <div className="w-full max-w-md mt-4">
             <BackendStatus />
+          </div>
+
+          <div className="w-full max-w-md mt-6">
+            <FileUpload />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-md mt-6">
