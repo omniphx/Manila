@@ -14,9 +14,9 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-l
 
 # Stage 3: Development
 FROM base AS dev
-RUN pnpm install
+RUN pnpm install --filter @manila/backend
 EXPOSE 3000
-CMD ["pnpm", "dev"]
+CMD ["pnpm", "--filter", "@manila/backend", "dev"]
 
 # Stage 4: Build
 FROM base AS build

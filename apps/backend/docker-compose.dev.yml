@@ -7,7 +7,4 @@ version: "3.8"
 services:
   postgres: {}
 
-  backend:
-    # Mount local code for hot-reloading in development
-    volumes:
-      - ../..:/app
+  backend: {}
