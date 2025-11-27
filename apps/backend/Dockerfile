@@ -10,7 +10,7 @@ WORKDIR /app
 
 # Stage 2: Production run-time dependencies
 FROM base AS prod-deps
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --filter @manila/backend --prod --frozen-lockfile
 
 # Stage 3: Development
 FROM base AS dev
@@ -20,7 +20,7 @@ CMD ["pnpm", "--filter", "@manila/backend", "dev"]
 
 # Stage 4: Build
 FROM base AS build
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --filter @manila/backend --frozen-lockfile
 RUN pnpm --filter @manila/backend build
 
 # Stage 5: Production
