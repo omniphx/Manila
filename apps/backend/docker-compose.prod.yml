@@ -5,15 +5,11 @@
 version: "3.8"
 
 services:
-  postgres:
-    env_file:
-      - .env.production
+  postgres: {}
 
   backend:
     build:
       target: production
-    env_file:
-      - .env.production
     # No volumes in production - use the built image
     # Override the base command to use the Dockerfile's production CMD
     # This overrides the dev default from docker-compose.yml

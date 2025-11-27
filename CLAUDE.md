@@ -29,13 +29,15 @@ The backend requires environment variables to be configured. Copy the example fi
 
 ```bash
 cd apps/backend
-cp .env.example .env.development
+cp .env.example .env
 ```
 
 Required environment variables:
 - `DATABASE_URL` - PostgreSQL connection string
 - `CLERK_PUBLISHABLE_KEY` - Clerk authentication public key
 - `CLERK_SECRET_KEY` - Clerk authentication secret key
+
+**Note:** The `.env` file contains secrets and should not be committed to version control. It's already in `.gitignore`.
 
 #### Frontend (Vercel)
 
