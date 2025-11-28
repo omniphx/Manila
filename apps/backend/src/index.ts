@@ -16,12 +16,65 @@ import { db } from "./lib/db.js";
 import { files } from "./db/schema.js";
 import { createContext } from "./trpc/context.js";
 import { appRouter, type AppRouter } from "./trpc/router.js";
-import { sql } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
+import { extractFileContent } from "./services/file-extraction.js";
 
 const UPLOAD_DIR = join(process.cwd(), 'uploads');
 
 // Ensure upload directory exists
 await fs.mkdir(UPLOAD_DIR, { recursive: true });
+
+/**
+ * Process file extraction asynchronously
+ */
+async function processFileExtraction(
+  fileId: string,
+  filePath: string,
+  mimeType: string,
+  originalFilename: string
+): Promise<void> {
+  try {
+    // Update status to processing
+    await db
+      .update(files)
+      .set({ processingStatus: 'processing' })
+      .where(eq(files.id, fileId));
+
+    // Extract content
+    const result = await extractFileContent(filePath, mimeType, originalFilename);
+
+    if (result.success) {
+      // Update with extracted content
+      await db
+        .update(files)
+        .set({
+          extractedContent: result.content,
+          processingStatus: 'completed',
+          processingError: null,
+        })
+        .where(eq(files.id, fileId));
+    } else {
+      // Update with error
+      await db
+        .update(files)
+        .set({
+          processingStatus: 'failed',
+          processingError: result.error || 'Unknown error',
+        })
+        .where(eq(files.id, fileId));
+    }
+  } catch (error) {
+    // Handle unexpected errors
+    await db
+      .update(files)
+      .set({
+        processingStatus: 'failed',
+        processingError: error instanceof Error ? error.message : 'Unknown error',
+      })
+      .where(eq(files.id, fileId));
+    throw error;
+  }
+}
 
 const server = Fastify({
   logger: {
@@ -176,8 +229,14 @@ async function main() {
             mimeType: data.mimetype,
             size: buffer.length.toString(),
             path: filePath,
+            processingStatus: 'pending',
           })
           .returning();
+
+        // Trigger async extraction (non-blocking)
+        processFileExtraction(newFile.id, filePath, data.mimetype, data.filename).catch((err) => {
+          server.log.error({ err, fileId: newFile.id }, 'Failed to process file extraction');
+        });
 
         return {
           id: newFile.id,
@@ -186,6 +245,7 @@ async function main() {
           mimeType: newFile.mimeType,
           size: newFile.size,
           createdAt: newFile.createdAt,
+          processingStatus: newFile.processingStatus,
         };
       } catch (error) {
         server.log.error(error);

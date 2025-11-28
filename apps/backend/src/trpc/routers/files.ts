@@ -82,6 +82,9 @@ export const filesRouter = router({
           mimeType: files.mimeType,
           size: files.size,
           createdAt: files.createdAt,
+          processingStatus: files.processingStatus,
+          processingError: files.processingError,
+          extractedContent: files.extractedContent,
         })
         .from(files)
         .where(eq(files.userId, ctx.user.userId))
