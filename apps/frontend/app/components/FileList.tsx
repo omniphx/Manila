@@ -2,10 +2,14 @@
 
 import { SignedIn, SignedOut, useAuth } from "@clerk/nextjs";
 import { trpc } from "@/lib/trpc";
+import { useState } from "react";
 
 export function FileList() {
   const { getToken } = useAuth();
   const { data: files, isLoading, error } = trpc.files.list.useQuery({ limit: 20, offset: 0 });
+  const deleteMutation = trpc.files.delete.useMutation();
+  const utils = trpc.useUtils();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleDownload = async (fileId: string, filename: string) => {
     try {
@@ -32,6 +36,24 @@ export function FileList() {
     } catch (err) {
       console.error("Download error:", err);
       alert("Failed to download file");
+    }
+  };
+
+  const handleDelete = async (fileId: string, filename: string) => {
+    if (!confirm(`Are you sure you want to delete "${filename}"?`)) {
+      return;
+    }
+
+    setDeletingId(fileId);
+    try {
+      await deleteMutation.mutateAsync({ id: fileId });
+      // Invalidate the files list query to trigger a refetch
+      await utils.files.list.invalidate();
+    } catch (err) {
+      console.error("Delete error:", err);
+      alert("Failed to delete file");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -84,12 +106,22 @@ export function FileList() {
                       {(parseInt(file.size) / 1024).toFixed(2)} KB • {new Date(file.createdAt).toLocaleDateString()}
                     </p>
                   </div>
-                  <button
-                    onClick={() => handleDownload(file.id, file.originalFilename)}
-                    className="ml-4 text-sm text-[#6c47ff] hover:text-[#5a3ad6] font-medium"
-                  >
-                    Download
-                  </button>
+                  <div className="flex items-center gap-2 ml-4">
+                    <button
+                      onClick={() => handleDownload(file.id, file.originalFilename)}
+                      className="text-sm text-[#6c47ff] hover:text-[#5a3ad6] font-medium"
+                      disabled={deletingId === file.id}
+                    >
+                      Download
+                    </button>
+                    <button
+                      onClick={() => handleDelete(file.id, file.originalFilename)}
+                      disabled={deletingId === file.id}
+                      className="text-sm text-[#6c47ff] hover:text-[#5a3ad6] font-medium disabled:opacity-50"
+                    >
+                      {deletingId === file.id ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
