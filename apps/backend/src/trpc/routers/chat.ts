@@ -12,7 +12,7 @@ export const chatRouter = router({
       const [conversation] = await ctx.db
         .insert(conversations)
         .values({
-          userId: ctx.user.id,
+          userId: ctx.user.userId,
           title: input.title,
         })
         .returning();
@@ -25,7 +25,7 @@ export const chatRouter = router({
     return ctx.db
       .select()
       .from(conversations)
-      .where(eq(conversations.userId, ctx.user.id))
+      .where(eq(conversations.userId, ctx.user.userId))
       .orderBy(desc(conversations.updatedAt));
   }),
 
@@ -40,7 +40,7 @@ export const chatRouter = router({
         .where(eq(conversations.id, input.conversationId))
         .limit(1);
 
-      if (!conversation || conversation.userId !== ctx.user.id) {
+      if (!conversation || conversation.userId !== ctx.user.userId) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Conversation not found',
@@ -70,7 +70,7 @@ export const chatRouter = router({
         .where(eq(conversations.id, input.conversationId))
         .limit(1);
 
-      if (!conversation || conversation.userId !== ctx.user.id) {
+      if (!conversation || conversation.userId !== ctx.user.userId) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Conversation not found',
@@ -89,7 +89,7 @@ export const chatRouter = router({
 
       // Get user's files for context
       const userFiles = await ctx.db.query.files.findMany({
-        where: (files, { eq }) => eq(files.userId, ctx.user.id),
+        where: (files, { eq }) => eq(files.userId, ctx.user.userId),
       });
 
       // TODO: Implement AI response generation using embeddings
