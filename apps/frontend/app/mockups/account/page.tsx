@@ -12,15 +12,19 @@ import { useState } from "react";
  * - Toggle switches for binary preferences (consistent with modern settings UIs)
  * - Danger zone at bottom with red accents to indicate destructive actions
  * - "Manage in Clerk" buttons indicate Clerk-handled functionality
+ * - Sign out button uses secondary/neutral styling (zinc colors) since it's not a primary action
+ * - Sign out placed alongside Edit Profile in a vertical stack for easy access
  *
  * Trade-offs:
  * - Read-only profile display since Clerk handles profile editing
  * - Kept notification options simple rather than granular per-notification-type
  * - Single danger zone action (delete) rather than multiple destructive options
+ * - Sign out is secondary-styled rather than in the danger zone since it's reversible
  *
  * Clerk Integration Notes:
  * - Avatar, name, and email are managed by Clerk and displayed read-only
  * - "Edit Profile" redirects to Clerk's user profile modal
+ * - "Sign Out" calls Clerk's signOut method and redirects to home
  * - Connected accounts section could use Clerk's OAuth connections
  */
 
@@ -110,6 +114,14 @@ function ChevronLeftIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+    </svg>
+  );
+}
+
+function LogOutIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
     </svg>
   );
 }
@@ -282,11 +294,19 @@ export default function AccountMockup() {
               </p>
             </div>
 
-            {/* Edit button - opens Clerk modal */}
-            <button className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-[#6c47ff] border border-[#6c47ff] rounded-lg hover:bg-[#6c47ff]/5 transition-colors">
-              Edit Profile
-              <ExternalLinkIcon className="w-4 h-4" />
-            </button>
+            {/* Actions */}
+            <div className="flex flex-col gap-2">
+              {/* Edit button - opens Clerk modal */}
+              <button className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-[#6c47ff] border border-[#6c47ff] rounded-lg hover:bg-[#6c47ff]/5 transition-colors">
+                Edit Profile
+                <ExternalLinkIcon className="w-4 h-4" />
+              </button>
+              {/* Sign Out button - secondary/neutral style since it's not a primary action */}
+              <button className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
+                <LogOutIcon className="w-4 h-4" />
+                Sign Out
+              </button>
+            </div>
           </div>
         </SettingsSection>
 

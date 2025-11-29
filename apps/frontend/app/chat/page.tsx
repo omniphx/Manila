@@ -214,7 +214,10 @@ export default function ChatPage() {
 
         {/* User Profile Badge */}
         <div className="border-t border-zinc-200 dark:border-zinc-800 p-2">
-          <button className={`w-full flex items-center gap-3 p-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors ${sidebarOpen ? '' : 'justify-center'}`}>
+          <Link
+            href="/account"
+            className={`w-full flex items-center gap-3 p-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors ${sidebarOpen ? '' : 'justify-center'}`}
+          >
             {/* Avatar */}
             {userImageUrl ? (
               <img
@@ -240,7 +243,7 @@ export default function ChatPage() {
             {sidebarOpen && (
               <SettingsIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" />
             )}
-          </button>
+          </Link>
         </div>
       </div>
 
