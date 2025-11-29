@@ -17,6 +17,21 @@ export default function MockupsPage() {
       title: "Upload Flow",
       description: "Drag-and-drop upload with progress indicators and processing status",
     },
+    {
+      href: "/mockups/not-found",
+      title: "404 Not Found",
+      description: "Friendly page not found with navigation options",
+    },
+    {
+      href: "/mockups/error-page",
+      title: "Error Page",
+      description: "General error page with retry options and technical details",
+    },
+    {
+      href: "/mockups/backend-status",
+      title: "Backend Status",
+      description: "Dev-only floating indicator showing backend connection status",
+    },
   ];
 
   return (
