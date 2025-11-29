@@ -2,6 +2,7 @@ import { SignedIn, SignedOut } from "@clerk/nextjs";
 import { HeroSection } from "./components/landing/HeroSection";
 import { ChatPreview } from "./components/landing/ChatPreview";
 import { FeatureCards } from "./components/landing/FeatureCards";
+import { Footer } from "./components/landing/Footer";
 
 export default function Home() {
   return (
@@ -16,6 +17,7 @@ export default function Home() {
               <FeatureCards />
             </div>
           </main>
+          <Footer />
         </div>
       </SignedOut>
 
