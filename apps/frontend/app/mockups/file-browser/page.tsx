@@ -1,0 +1,528 @@
+"use client";
+
+import { useState } from "react";
+
+/**
+ * File Browser Mockup
+ *
+ * Design Decisions:
+ * - Two-pane layout: folder tree on left, file grid/list on right
+ * - Toggle between grid and list view for different use cases
+ * - Breadcrumb navigation for quick path traversal
+ * - Inline actions (download, delete) appear on hover to reduce visual clutter
+ * - Processing status badges match existing FileList component patterns
+ * - Clear "Back to Chat" button for easy navigation
+ *
+ * Trade-offs:
+ * - Chose fixed folder tree width over resizable to reduce complexity
+ * - Single-select rather than multi-select for initial simplicity
+ * - No drag-and-drop folder reorganization yet (can be added later)
+ */
+
+// Mock data
+const mockFolders = [
+  { id: "root", name: "All Files", parentId: null },
+  { id: "f1", name: "Financial Reports", parentId: "root" },
+  { id: "f2", name: "Marketing", parentId: "root" },
+  { id: "f3", name: "Product", parentId: "root" },
+  { id: "f4", name: "Q3 2024", parentId: "f1" },
+  { id: "f5", name: "Q4 2024", parentId: "f1" },
+];
+
+const mockFiles = [
+  {
+    id: "file1",
+    name: "Q3-Financial-Report.pdf",
+    type: "pdf",
+    size: 2457600,
+    folderId: "f4",
+    processingStatus: "completed" as const,
+    createdAt: "2024-10-15T10:30:00Z",
+  },
+  {
+    id: "file2",
+    name: "Q3-Revenue-Analysis.xlsx",
+    type: "xlsx",
+    size: 156000,
+    folderId: "f4",
+    processingStatus: "completed" as const,
+    createdAt: "2024-10-14T14:22:00Z",
+  },
+  {
+    id: "file3",
+    name: "Market-Analysis-2024.pdf",
+    type: "pdf",
+    size: 3840000,
+    folderId: "f2",
+    processingStatus: "processing" as const,
+    createdAt: "2024-10-18T09:15:00Z",
+  },
+  {
+    id: "file4",
+    name: "Product-Roadmap.docx",
+    type: "docx",
+    size: 89000,
+    folderId: "f3",
+    processingStatus: "completed" as const,
+    createdAt: "2024-10-12T16:45:00Z",
+  },
+  {
+    id: "file5",
+    name: "Customer-Feedback-Summary.txt",
+    type: "txt",
+    size: 24000,
+    folderId: "f3",
+    processingStatus: "pending" as const,
+    createdAt: "2024-10-19T11:00:00Z",
+  },
+  {
+    id: "file6",
+    name: "Brand-Guidelines.pdf",
+    type: "pdf",
+    size: 5120000,
+    folderId: "f2",
+    processingStatus: "failed" as const,
+    createdAt: "2024-10-17T08:30:00Z",
+  },
+];
+
+// Icons
+function FileIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+    </svg>
+  );
+}
+
+function FolderIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+    </svg>
+  );
+}
+
+function FolderOpenIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776" />
+    </svg>
+  );
+}
+
+function ChatIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+    </svg>
+  );
+}
+
+function GridIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+    </svg>
+  );
+}
+
+function ListIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
+    </svg>
+  );
+}
+
+function UploadIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+    </svg>
+  );
+}
+
+function DownloadIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+    </svg>
+  );
+}
+
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+    </svg>
+  );
+}
+
+function PlusIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+    </svg>
+  );
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
+
+function formatDate(dateString: string): string {
+  return new Date(dateString).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function getStatusBadge(status: string) {
+  switch (status) {
+    case "pending":
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
+          Pending
+        </span>
+      );
+    case "processing":
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
+          Processing...
+        </span>
+      );
+    case "completed":
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
+          Ready
+        </span>
+      );
+    case "failed":
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400">
+          Failed
+        </span>
+      );
+    default:
+      return null;
+  }
+}
+
+function getFileTypeIcon(type: string) {
+  const colors: Record<string, string> = {
+    pdf: "text-red-500",
+    docx: "text-blue-500",
+    xlsx: "text-green-500",
+    txt: "text-zinc-500",
+  };
+  return colors[type] || "text-zinc-500";
+}
+
+export default function FileBrowserMockup() {
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [selectedFolder, setSelectedFolder] = useState("root");
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(["root"]));
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+
+  // Build folder tree
+  const getFolderChildren = (parentId: string | null) =>
+    mockFolders.filter((f) => f.parentId === parentId);
+
+  const getFilesInFolder = (folderId: string) => {
+    // For "All Files" (root), show files that would be at root level
+    if (folderId === "root") {
+      return mockFiles.filter((f) => !f.folderId || f.folderId === "root");
+    }
+    return mockFiles.filter((f) => f.folderId === folderId);
+  };
+
+  // For demo, show all files when viewing root
+  const displayFiles = selectedFolder === "root" ? mockFiles : getFilesInFolder(selectedFolder);
+
+  const toggleFolder = (folderId: string) => {
+    const newExpanded = new Set(expandedFolders);
+    if (newExpanded.has(folderId)) {
+      newExpanded.delete(folderId);
+    } else {
+      newExpanded.add(folderId);
+    }
+    setExpandedFolders(newExpanded);
+  };
+
+  const getBreadcrumbs = () => {
+    const crumbs: { id: string; name: string }[] = [];
+    let current = mockFolders.find((f) => f.id === selectedFolder);
+    while (current) {
+      crumbs.unshift(current);
+      current = mockFolders.find((f) => f.id === current!.parentId);
+    }
+    return crumbs;
+  };
+
+  const renderFolderTree = (parentId: string | null, depth: number = 0) => {
+    const children = getFolderChildren(parentId);
+    return children.map((folder) => {
+      const hasChildren = getFolderChildren(folder.id).length > 0;
+      const isExpanded = expandedFolders.has(folder.id);
+      const isSelected = selectedFolder === folder.id;
+
+      return (
+        <div key={folder.id}>
+          <button
+            onClick={() => {
+              setSelectedFolder(folder.id);
+              if (hasChildren) toggleFolder(folder.id);
+            }}
+            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors ${
+              isSelected
+                ? "bg-[#6c47ff]/10 text-[#6c47ff]"
+                : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            }`}
+            style={{ paddingLeft: `${depth * 12 + 8}px` }}
+          >
+            {hasChildren ? (
+              isExpanded ? (
+                <ChevronDownIcon className="w-4 h-4 flex-shrink-0 text-zinc-400" />
+              ) : (
+                <ChevronRightIcon className="w-4 h-4 flex-shrink-0 text-zinc-400" />
+              )
+            ) : (
+              <span className="w-4" />
+            )}
+            {isSelected ? (
+              <FolderOpenIcon className="w-4 h-4 flex-shrink-0 text-[#6c47ff]" />
+            ) : (
+              <FolderIcon className="w-4 h-4 flex-shrink-0 text-zinc-400" />
+            )}
+            <span className="text-sm truncate">{folder.name}</span>
+          </button>
+          {hasChildren && isExpanded && renderFolderTree(folder.id, depth + 1)}
+        </div>
+      );
+    });
+  };
+
+  return (
+    <div className="flex h-[calc(100vh-8rem)] bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+      {/* Folder Tree Sidebar */}
+      <div className="w-56 flex-shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 flex flex-col">
+        {/* Sidebar Header */}
+        <div className="p-3 border-b border-zinc-200 dark:border-zinc-800">
+          <button className="flex items-center gap-2 text-sm font-medium text-[#6c47ff] hover:text-[#5a3ad6] transition-colors">
+            <ChatIcon className="w-4 h-4" />
+            Back to Chat
+          </button>
+        </div>
+
+        {/* New Folder Button */}
+        <div className="p-2 border-b border-zinc-200 dark:border-zinc-800">
+          <button className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-[#6c47ff] hover:text-[#6c47ff] transition-colors text-sm">
+            <PlusIcon className="w-4 h-4" />
+            New Folder
+          </button>
+        </div>
+
+        {/* Folder Tree */}
+        <div className="flex-1 overflow-y-auto p-2">
+          {renderFolderTree(null)}
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Breadcrumbs */}
+            <nav className="flex items-center gap-1 text-sm">
+              {getBreadcrumbs().map((crumb, index, arr) => (
+                <span key={crumb.id} className="flex items-center gap-1">
+                  <button
+                    onClick={() => setSelectedFolder(crumb.id)}
+                    className={`hover:text-[#6c47ff] transition-colors ${
+                      index === arr.length - 1
+                        ? "text-zinc-900 dark:text-zinc-100 font-medium"
+                        : "text-zinc-500 dark:text-zinc-400"
+                    }`}
+                  >
+                    {crumb.name}
+                  </button>
+                  {index < arr.length - 1 && (
+                    <ChevronRightIcon className="w-3 h-3 text-zinc-400" />
+                  )}
+                </span>
+              ))}
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* View Toggle */}
+            <div className="flex items-center border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden">
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`p-2 transition-colors ${
+                  viewMode === "grid"
+                    ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                    : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                }`}
+              >
+                <GridIcon className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("list")}
+                className={`p-2 transition-colors ${
+                  viewMode === "list"
+                    ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                    : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                }`}
+              >
+                <ListIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Upload Button */}
+            <button className="flex items-center gap-2 px-4 py-2 bg-[#6c47ff] text-white rounded-full text-sm font-medium hover:bg-[#5a3ad6] transition-colors">
+              <UploadIcon className="w-4 h-4" />
+              Upload
+            </button>
+          </div>
+        </div>
+
+        {/* File Grid/List */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {displayFiles.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <FolderIcon className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mb-4" />
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                No files in this folder
+              </p>
+              <button className="mt-4 text-sm text-[#6c47ff] hover:text-[#5a3ad6] font-medium">
+                Upload your first file
+              </button>
+            </div>
+          ) : viewMode === "grid" ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {displayFiles.map((file) => (
+                <div
+                  key={file.id}
+                  onClick={() => setSelectedFile(file.id === selectedFile ? null : file.id)}
+                  className={`group relative p-4 rounded-lg border transition-all cursor-pointer ${
+                    selectedFile === file.id
+                      ? "border-[#6c47ff] bg-[#6c47ff]/5"
+                      : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-900"
+                  }`}
+                >
+                  {/* File Icon */}
+                  <div className="flex justify-center mb-3">
+                    <FileIcon className={`w-10 h-10 ${getFileTypeIcon(file.type)}`} />
+                  </div>
+
+                  {/* File Name */}
+                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate text-center">
+                    {file.name}
+                  </p>
+
+                  {/* File Size */}
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center mt-1">
+                    {formatFileSize(file.size)}
+                  </p>
+
+                  {/* Status Badge */}
+                  <div className="flex justify-center mt-2">
+                    {getStatusBadge(file.processingStatus)}
+                  </div>
+
+                  {/* Hover Actions */}
+                  <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button className="p-1.5 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:text-[#6c47ff] transition-colors shadow-sm">
+                      <DownloadIcon className="w-3.5 h-3.5" />
+                    </button>
+                    <button className="p-1.5 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:text-red-500 transition-colors shadow-sm">
+                      <TrashIcon className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {/* List Header */}
+              <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                <div className="col-span-5">Name</div>
+                <div className="col-span-2">Size</div>
+                <div className="col-span-2">Status</div>
+                <div className="col-span-2">Date</div>
+                <div className="col-span-1"></div>
+              </div>
+
+              {/* List Items */}
+              {displayFiles.map((file) => (
+                <div
+                  key={file.id}
+                  onClick={() => setSelectedFile(file.id === selectedFile ? null : file.id)}
+                  className={`group grid grid-cols-12 gap-4 px-4 py-3 rounded-lg items-center transition-colors cursor-pointer ${
+                    selectedFile === file.id
+                      ? "bg-[#6c47ff]/5 border border-[#6c47ff]"
+                      : "hover:bg-zinc-50 dark:hover:bg-zinc-900"
+                  }`}
+                >
+                  <div className="col-span-5 flex items-center gap-3 min-w-0">
+                    <FileIcon className={`w-5 h-5 flex-shrink-0 ${getFileTypeIcon(file.type)}`} />
+                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
+                      {file.name}
+                    </span>
+                  </div>
+                  <div className="col-span-2 text-sm text-zinc-500 dark:text-zinc-400">
+                    {formatFileSize(file.size)}
+                  </div>
+                  <div className="col-span-2">{getStatusBadge(file.processingStatus)}</div>
+                  <div className="col-span-2 text-sm text-zinc-500 dark:text-zinc-400">
+                    {formatDate(file.createdAt)}
+                  </div>
+                  <div className="col-span-1 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button className="p-1.5 rounded-md text-zinc-500 hover:text-[#6c47ff] transition-colors">
+                      <DownloadIcon className="w-4 h-4" />
+                    </button>
+                    <button className="p-1.5 rounded-md text-zinc-500 hover:text-red-500 transition-colors">
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer Stats */}
+        <div className="px-6 py-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
+          <span>
+            {displayFiles.length} {displayFiles.length === 1 ? "file" : "files"}
+          </span>
+          <span>
+            {displayFiles.filter((f) => f.processingStatus === "completed").length} ready for chat
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
