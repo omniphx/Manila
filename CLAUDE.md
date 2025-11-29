@@ -281,3 +281,30 @@ Each package has its own `tsconfig.json` with appropriate settings for its envir
 - **Mobile**: Expo base config with React Native environment
 
 All packages use strict mode.
+
+## UI Mockups
+
+This project uses **code-based mockups** instead of traditional UI design tools like Figma. The rationale:
+
+- **AI agents can create mockups more effectively with code** using the existing component libraries (Tailwind CSS, React) already in the codebase
+- Mockups stay in sync with the actual implementation—same components, same styling system
+- No context-switching between design tools and code
+- Mockups can be interactive and functional from day one
+
+### Mockups Route
+
+The frontend includes a development-only `/mockups` route for UI prototyping:
+
+- **Location**: `apps/frontend/app/mockups/`
+- **Access**: Only available when `NODE_ENV=development` (returns 404 in production)
+- **URL**: `http://localhost:3000/mockups`
+
+To add a new mockup, create a folder under `app/mockups/`:
+
+```
+apps/frontend/app/mockups/
+├── layout.tsx          # Dev-only gate + shared layout
+├── page.tsx            # Index listing all mockups
+└── my-feature/         # Your mockup
+    └── page.tsx
+```
