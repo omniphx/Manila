@@ -40,13 +40,13 @@ The current implementation includes:
 
 | Issue | Title | Priority | Status |
 |-------|-------|----------|--------|
-| [#1](https://github.com/omniphx/Manila/issues/1) | Implement landing page hero section | High | Todo |
-| [#2](https://github.com/omniphx/Manila/issues/2) | Add landing page feature cards component | High | Todo |
-| [#3](https://github.com/omniphx/Manila/issues/3) | Create chat preview component for landing page | High | Todo |
-| [#4](https://github.com/omniphx/Manila/issues/4) | Add footer component for landing page | High | Todo |
-| [#5](https://github.com/omniphx/Manila/issues/5) | Implement authenticated user redirect from landing page | High | Todo |
-| [#6](https://github.com/omniphx/Manila/issues/6) | Implement drag-and-drop file upload overlay | Medium | Todo |
-| [#7](https://github.com/omniphx/Manila/issues/7) | Add upload progress indicators in chat | Medium | Todo |
+| [#1](https://github.com/omniphx/Manila/issues/1) | Implement landing page hero section | High | Done |
+| [#2](https://github.com/omniphx/Manila/issues/2) | Add landing page feature cards component | High | Done |
+| [#3](https://github.com/omniphx/Manila/issues/3) | Create chat preview component for landing page | High | Done |
+| [#4](https://github.com/omniphx/Manila/issues/4) | Add footer component for landing page | High | Done |
+| [#5](https://github.com/omniphx/Manila/issues/5) | Implement authenticated user redirect from landing page | High | Done |
+| [#6](https://github.com/omniphx/Manila/issues/6) | Implement drag-and-drop file upload overlay | Medium | Done |
+| [#7](https://github.com/omniphx/Manila/issues/7) | Add upload progress indicators in chat | Medium | Done |
 | [#8](https://github.com/omniphx/Manila/issues/8) | Add file processing status messages | Medium | Todo |
 | [#9](https://github.com/omniphx/Manila/issues/9) | Implement pending file chips UI | Medium | Todo |
 | [#10](https://github.com/omniphx/Manila/issues/10) | Implement real-time chat message sending | Medium | Todo |
@@ -58,7 +58,7 @@ The current implementation includes:
 | [#16](https://github.com/omniphx/Manila/issues/16) | Convert BackendStatus to floating indicator | Low | Todo |
 | [#17](https://github.com/omniphx/Manila/issues/17) | Implement dark mode theme switching | Low | Todo |
 | [#18](https://github.com/omniphx/Manila/issues/18) | Implement compact view option | Low | Todo |
-| [#19](https://github.com/omniphx/Manila/issues/19) | Add trust and security section to landing page | High | Todo |
+| [#19](https://github.com/omniphx/Manila/issues/19) | Add trust and security section to landing page | High | Done |
 | [#20](https://github.com/omniphx/Manila/issues/20) | Persist user preferences to database | Low | Todo |
 
 ## Identified Gaps
