@@ -5,6 +5,7 @@ import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { DragDropOverlay } from "../components/DragDropOverlay";
 import { UploadProgress, type UploadFile } from "../components/UploadProgress";
+import { ProcessingStatus, type ProcessingFile } from "../components/ProcessingStatus";
 import { uploadFile } from "../actions/upload";
 
 // Mock data for demonstration
@@ -124,6 +125,7 @@ export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [inputValue, setInputValue] = useState("");
   const [uploadingFiles, setUploadingFiles] = useState<UploadFile[]>([]);
+  const [processingFiles, setProcessingFiles] = useState<ProcessingFile[]>([]);
   const { user } = useUser();
 
   const userName = user?.fullName || user?.firstName || "User";
@@ -168,18 +170,79 @@ export default function ChatPage() {
 
         clearInterval(progressInterval);
 
-        setUploadingFiles((prev) =>
-          prev.map((f) =>
-            f.id === uploadFileEntry.id
-              ? {
-                  ...f,
-                  progress: 100,
-                  status: result.success ? "completed" : "error",
-                  error: result.success ? undefined : result.error,
-                }
-              : f
-          )
-        );
+        if (result.success) {
+          // Mark upload as complete
+          setUploadingFiles((prev) =>
+            prev.map((f) =>
+              f.id === uploadFileEntry.id
+                ? { ...f, progress: 100, status: "completed" }
+                : f
+            )
+          );
+
+          // Add to processing queue
+          const processingId = `process-${Date.now()}-${i}`;
+          setProcessingFiles((prev) => [
+            ...prev,
+            {
+              id: processingId,
+              name: file.name,
+              status: "processing",
+              progress: "Analyzing document structure...",
+            },
+          ]);
+
+          // Simulate processing with status updates
+          setTimeout(() => {
+            setProcessingFiles((prev) =>
+              prev.map((f) =>
+                f.id === processingId
+                  ? { ...f, progress: "Extracting text content..." }
+                  : f
+              )
+            );
+          }, 1000);
+
+          setTimeout(() => {
+            setProcessingFiles((prev) =>
+              prev.map((f) =>
+                f.id === processingId
+                  ? { ...f, progress: "Generating embeddings..." }
+                  : f
+              )
+            );
+          }, 2000);
+
+          // Complete processing
+          setTimeout(() => {
+            setProcessingFiles((prev) =>
+              prev.map((f) =>
+                f.id === processingId
+                  ? {
+                      ...f,
+                      status: "completed",
+                      pages: Math.floor(Math.random() * 50) + 1,
+                    }
+                  : f
+              )
+            );
+          }, 3000);
+
+          // Clear completed processing after 5 seconds
+          setTimeout(() => {
+            setProcessingFiles((prev) =>
+              prev.filter((f) => f.id !== processingId || f.status !== "completed")
+            );
+          }, 8000);
+        } else {
+          setUploadingFiles((prev) =>
+            prev.map((f) =>
+              f.id === uploadFileEntry.id
+                ? { ...f, status: "error", error: result.error }
+                : f
+            )
+          );
+        }
       } catch (error) {
         setUploadingFiles((prev) =>
           prev.map((f) =>
@@ -391,6 +454,11 @@ export default function ChatPage() {
           {/* Upload Progress */}
           {uploadingFiles.length > 0 && (
             <UploadProgress files={uploadingFiles} onCancel={handleCancelUpload} />
+          )}
+
+          {/* Processing Status */}
+          {processingFiles.length > 0 && (
+            <ProcessingStatus files={processingFiles} />
           )}
         </div>
 
