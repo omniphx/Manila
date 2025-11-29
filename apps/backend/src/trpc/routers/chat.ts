@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure } from '../trpc.js';
 import { conversations, messages } from '../../db/schema.js';
 import { eq, desc } from 'drizzle-orm';
@@ -40,7 +41,10 @@ export const chatRouter = router({
         .limit(1);
 
       if (!conversation || conversation.userId !== ctx.user.id) {
-        throw new Error('Conversation not found');
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Conversation not found',
+        });
       }
 
       return ctx.db
@@ -55,7 +59,7 @@ export const chatRouter = router({
     .input(
       z.object({
         conversationId: z.string().uuid(),
-        content: z.string().min(1),
+        content: z.string().min(1).max(10000),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -67,7 +71,10 @@ export const chatRouter = router({
         .limit(1);
 
       if (!conversation || conversation.userId !== ctx.user.id) {
-        throw new Error('Conversation not found');
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Conversation not found',
+        });
       }
 
       // Save user message

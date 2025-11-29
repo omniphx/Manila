@@ -128,6 +128,7 @@ export default function ChatPage() {
   const [processingFiles, setProcessingFiles] = useState<ProcessingFile[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useUser();
 
@@ -137,6 +138,7 @@ export default function ChatPage() {
   const userImageUrl = user?.imageUrl;
 
   // Create or get existing conversation
+  const { data: conversations = [], isLoading: loadingConversations } = trpc.chat.getConversations.useQuery();
   const createConversation = trpc.chat.createConversation.useMutation();
   const { data: messages = [], refetch: refetchMessages } = trpc.chat.getMessages.useQuery(
     { conversationId: conversationId! },
@@ -144,19 +146,25 @@ export default function ChatPage() {
   );
   const sendMessage = trpc.chat.sendMessage.useMutation();
 
-  // Initialize conversation on mount
+  // Initialize conversation on mount - load most recent or create new
   useEffect(() => {
-    if (!conversationId) {
-      createConversation.mutate(
-        { title: "New Conversation" },
-        {
-          onSuccess: (data) => {
-            setConversationId(data.id);
-          },
-        }
-      );
+    if (!conversationId && !loadingConversations) {
+      if (conversations.length > 0) {
+        // Load the most recent conversation
+        setConversationId(conversations[0].id);
+      } else {
+        // Create new conversation if none exist
+        createConversation.mutate(
+          { title: "New Conversation" },
+          {
+            onSuccess: (data) => {
+              setConversationId(data.id);
+            },
+          }
+        );
+      }
     }
-  }, [conversationId]);
+  }, [conversationId, conversations, loadingConversations, createConversation]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -169,6 +177,7 @@ export default function ChatPage() {
     const content = inputValue.trim();
     setInputValue("");
     setIsTyping(true);
+    setError(null);
 
     try {
       await sendMessage.mutateAsync({
@@ -178,8 +187,12 @@ export default function ChatPage() {
 
       // Refetch messages to get the new user message and AI response
       await refetchMessages();
-    } catch (error) {
-      console.error('Failed to send message:', error);
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send message. Please try again.';
+      setError(errorMessage);
+      // Restore the message in case of error
+      setInputValue(content);
     } finally {
       setIsTyping(false);
     }
@@ -536,6 +549,25 @@ export default function ChatPage() {
 
         {/* Input Area */}
         <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+          {/* Error Message */}
+          {error && (
+            <div className="mb-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2">
+              <svg className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+              </div>
+              <button
+                onClick={() => setError(null)}
+                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
           <div className="flex items-center gap-3">
             {/* File Upload Button */}
             <button
