@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { DragDropOverlay } from "../components/DragDropOverlay";
+import { UploadProgress, type UploadFile } from "../components/UploadProgress";
 import { uploadFile } from "../actions/upload";
 
 // Mock data for demonstration
@@ -122,7 +123,7 @@ function getInitials(firstName?: string | null, lastName?: string | null): strin
 export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [inputValue, setInputValue] = useState("");
-  const [isUploading, setIsUploading] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState<UploadFile[]>([]);
   const { user } = useUser();
 
   const userName = user?.fullName || user?.firstName || "User";
@@ -133,18 +134,71 @@ export default function ChatPage() {
   const handleFilesDropped = async (files: File[]) => {
     if (files.length === 0) return;
 
-    setIsUploading(true);
-    try {
-      for (const file of files) {
+    // Create initial upload file entries
+    const newUploadFiles: UploadFile[] = files.map((file, index) => ({
+      id: `upload-${Date.now()}-${index}`,
+      name: file.name,
+      size: file.size,
+      progress: 0,
+      status: "uploading" as const,
+    }));
+
+    setUploadingFiles((prev) => [...prev, ...newUploadFiles]);
+
+    // Upload each file
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const uploadFileEntry = newUploadFiles[i];
+
+      try {
+        // Simulate progress updates (since server action doesn't support progress)
+        const progressInterval = setInterval(() => {
+          setUploadingFiles((prev) =>
+            prev.map((f) =>
+              f.id === uploadFileEntry.id && f.status === "uploading"
+                ? { ...f, progress: Math.min(f.progress + 10, 90) }
+                : f
+            )
+          );
+        }, 200);
+
         const formData = new FormData();
         formData.append("file", file);
-        await uploadFile(formData);
+        const result = await uploadFile(formData);
+
+        clearInterval(progressInterval);
+
+        setUploadingFiles((prev) =>
+          prev.map((f) =>
+            f.id === uploadFileEntry.id
+              ? {
+                  ...f,
+                  progress: 100,
+                  status: result.success ? "completed" : "error",
+                  error: result.success ? undefined : result.error,
+                }
+              : f
+          )
+        );
+      } catch (error) {
+        setUploadingFiles((prev) =>
+          prev.map((f) =>
+            f.id === uploadFileEntry.id
+              ? { ...f, status: "error", error: "Upload failed" }
+              : f
+          )
+        );
       }
-    } catch (error) {
-      console.error("Upload error:", error);
-    } finally {
-      setIsUploading(false);
     }
+
+    // Clear completed uploads after 3 seconds
+    setTimeout(() => {
+      setUploadingFiles((prev) => prev.filter((f) => f.status !== "completed"));
+    }, 3000);
+  };
+
+  const handleCancelUpload = (fileId: string) => {
+    setUploadingFiles((prev) => prev.filter((f) => f.id !== fileId));
   };
 
   return (
@@ -333,6 +387,11 @@ export default function ChatPage() {
               </div>
             </div>
           ))}
+
+          {/* Upload Progress */}
+          {uploadingFiles.length > 0 && (
+            <UploadProgress files={uploadingFiles} onCancel={handleCancelUpload} />
+          )}
         </div>
 
         {/* Input Area */}
