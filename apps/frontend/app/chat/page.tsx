@@ -152,8 +152,8 @@ export default function ChatPage() {
       if (conversations.length > 0) {
         // Load the most recent conversation
         setConversationId(conversations[0].id);
-      } else {
-        // Create new conversation if none exist
+      } else if (!createConversation.isPending) {
+        // Create new conversation if none exist and not already creating
         createConversation.mutate(
           { title: "New Conversation" },
           {
@@ -164,7 +164,9 @@ export default function ChatPage() {
         );
       }
     }
-  }, [conversationId, conversations, loadingConversations, createConversation]);
+    // Intentionally excluding createConversation from deps to avoid infinite loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, conversations, loadingConversations]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
