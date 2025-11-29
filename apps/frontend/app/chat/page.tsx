@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
+import Link from "next/link";
 
 // Mock data for demonstration
 const mockMessages = [
@@ -119,7 +120,6 @@ function getInitials(firstName?: string | null, lastName?: string | null): strin
 export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [inputValue, setInputValue] = useState("");
-  const [activeView, setActiveView] = useState<"chat" | "files">("chat");
   const { user } = useUser();
 
   const userName = user?.fullName || user?.firstName || "User";
@@ -158,27 +158,18 @@ export default function ChatPage() {
         <div className="p-2 border-b border-zinc-200 dark:border-zinc-800">
           <div className="flex flex-col gap-1">
             <button
-              onClick={() => setActiveView("chat")}
-              className={`flex items-center gap-2 px-2 py-2 rounded-md transition-colors ${
-                activeView === "chat"
-                  ? "bg-[#6c47ff]/10 text-[#6c47ff]"
-                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800"
-              }`}
+              className="flex items-center gap-2 px-2 py-2 rounded-md transition-colors bg-[#6c47ff]/10 text-[#6c47ff]"
             >
               <ChatIcon className="w-5 h-5 flex-shrink-0" />
               {sidebarOpen && <span className="text-sm font-medium">Chat</span>}
             </button>
-            <button
-              onClick={() => setActiveView("files")}
-              className={`flex items-center gap-2 px-2 py-2 rounded-md transition-colors ${
-                activeView === "files"
-                  ? "bg-[#6c47ff]/10 text-[#6c47ff]"
-                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800"
-              }`}
+            <Link
+              href="/files"
+              className="flex items-center gap-2 px-2 py-2 rounded-md transition-colors text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800"
             >
               <FolderIcon className="w-5 h-5 flex-shrink-0" />
               {sidebarOpen && <span className="text-sm font-medium">Files</span>}
-            </button>
+            </Link>
           </div>
         </div>
 
