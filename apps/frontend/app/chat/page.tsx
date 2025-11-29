@@ -1,22 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
-/**
- * Chat Main Interface Mockup
- *
- * Design Decisions:
- * - Chat is the primary experience with a collapsible sidebar for files
- * - Sidebar collapses to icons on mobile/when space is needed
- * - Messages show clear distinction between user and AI responses
- * - AI responses include clickable citations that reference source documents
- * - Input area is pinned to bottom with file upload button integrated
- *
- * Trade-offs:
- * - Chose a left sidebar over a right one for natural reading flow
- * - Citations are inline badges rather than footnotes for immediacy
- * - Kept sidebar simple (recent files only) vs full folder tree to reduce complexity
- */
+import { useUser } from "@clerk/nextjs";
 
 // Mock data for demonstration
 const mockMessages = [
@@ -59,7 +44,6 @@ const mockRecentFiles = [
   { id: "f5", name: "Team-Notes.pdf", type: "pdf" },
 ];
 
-// Simple icons as SVG components (no external library needed)
 function FileIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -108,14 +92,6 @@ function ChevronLeftIcon({ className }: { className?: string }) {
   );
 }
 
-function ChevronRightIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-    </svg>
-  );
-}
-
 function MenuIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -133,21 +109,26 @@ function SettingsIcon({ className }: { className?: string }) {
   );
 }
 
-// Mock user data
-const mockUser = {
-  name: "John Doe",
-  email: "john@example.com",
-  avatarUrl: null, // In real app, this would be from Clerk
-  initials: "JD",
-};
+// Helper to get user initials from name
+function getInitials(firstName?: string | null, lastName?: string | null): string {
+  const first = firstName?.[0] ?? "";
+  const last = lastName?.[0] ?? "";
+  return (first + last).toUpperCase() || "?";
+}
 
-export default function ChatMainMockup() {
+export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [inputValue, setInputValue] = useState("");
   const [activeView, setActiveView] = useState<"chat" | "files">("chat");
+  const { user } = useUser();
+
+  const userName = user?.fullName || user?.firstName || "User";
+  const userEmail = user?.primaryEmailAddress?.emailAddress || "";
+  const userInitials = getInitials(user?.firstName, user?.lastName);
+  const userImageUrl = user?.imageUrl;
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+    <div className="flex h-screen bg-white dark:bg-zinc-950 overflow-hidden">
       {/* Sidebar */}
       <div
         className={`${
@@ -244,16 +225,24 @@ export default function ChatMainMockup() {
         <div className="border-t border-zinc-200 dark:border-zinc-800 p-2">
           <button className={`w-full flex items-center gap-3 p-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors ${sidebarOpen ? '' : 'justify-center'}`}>
             {/* Avatar */}
-            <div className="w-8 h-8 rounded-full bg-[#6c47ff] flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
-              {mockUser.initials}
-            </div>
+            {userImageUrl ? (
+              <img
+                src={userImageUrl}
+                alt={userName}
+                className="w-8 h-8 rounded-full flex-shrink-0 object-cover"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-[#6c47ff] flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                {userInitials}
+              </div>
+            )}
             {sidebarOpen && (
               <div className="flex-1 min-w-0 text-left">
                 <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
-                  {mockUser.name}
+                  {userName}
                 </p>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
-                  {mockUser.email}
+                  {userEmail}
                 </p>
               </div>
             )}
