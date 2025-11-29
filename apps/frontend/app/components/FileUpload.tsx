@@ -88,6 +88,7 @@ export function FileUpload() {
             <input
               id="file-input"
               type="file"
+              accept="image/*,.pdf,.doc,.docx,.txt,.rtf,.odt"
               onChange={handleFileChange}
               className="block w-full text-sm text-zinc-900 dark:text-zinc-100
                 file:mr-4 file:py-2 file:px-4

@@ -24,6 +24,34 @@ const UPLOAD_DIR = join(process.cwd(), 'uploads');
 // Ensure upload directory exists
 await fs.mkdir(UPLOAD_DIR, { recursive: true });
 
+// Allowed MIME types - images and documents only
+const ALLOWED_MIME_TYPES = [
+  // Images
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/svg+xml',
+  'image/bmp',
+  'image/tiff',
+  // Documents
+  'application/pdf',
+  'application/msword', // .doc
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+  'text/plain',
+  'text/rtf',
+  'application/rtf',
+  'application/vnd.oasis.opendocument.text', // .odt
+];
+
+/**
+ * Check if a MIME type is allowed for upload
+ */
+function isAllowedMimeType(mimeType: string): boolean {
+  return ALLOWED_MIME_TYPES.includes(mimeType);
+}
+
 /**
  * Process file extraction asynchronously
  */
@@ -118,7 +146,7 @@ async function main() {
 
     await server.register(multipart, {
       limits: {
-        fileSize: 50 * 1024 * 1024, // 50MB max file size
+        fileSize: 200 * 1024 * 1024, // 200MB max file size
       },
     });
 
@@ -203,6 +231,16 @@ async function main() {
           return reply.code(400).send({
             error: {
               message: "No file uploaded",
+              statusCode: 400,
+            },
+          });
+        }
+
+        // Validate file type
+        if (!isAllowedMimeType(data.mimetype)) {
+          return reply.code(400).send({
+            error: {
+              message: `File type "${data.mimetype}" is not allowed. Please upload images or documents only (PDF, DOC, DOCX, TXT, RTF, ODT).`,
               statusCode: 400,
             },
           });
