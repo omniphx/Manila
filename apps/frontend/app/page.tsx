@@ -1,5 +1,6 @@
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import { HeroSection } from "./components/landing/HeroSection";
+import { ChatPreview } from "./components/landing/ChatPreview";
 import { FeatureCards } from "./components/landing/FeatureCards";
 
 export default function Home() {
@@ -11,6 +12,7 @@ export default function Home() {
           <main className="px-6 pt-16 pb-24">
             <div className="max-w-6xl mx-auto">
               <HeroSection />
+              <ChatPreview />
               <FeatureCards />
             </div>
           </main>
