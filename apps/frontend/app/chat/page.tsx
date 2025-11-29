@@ -1,45 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { DragDropOverlay } from "../components/DragDropOverlay";
 import { UploadProgress, type UploadFile } from "../components/UploadProgress";
 import { ProcessingStatus, type ProcessingFile } from "../components/ProcessingStatus";
 import { uploadFile } from "../actions/upload";
-
-// Mock data for demonstration
-const mockMessages = [
-  {
-    id: "1",
-    role: "user" as const,
-    content: "What are the key findings from the Q3 financial report?",
-  },
-  {
-    id: "2",
-    role: "assistant" as const,
-    content: "Based on the Q3 Financial Report, here are the key findings:\n\n1. **Revenue Growth**: Total revenue increased by 23% year-over-year, reaching $4.2M.\n\n2. **Operating Costs**: Operating expenses were reduced by 8% through process automation initiatives.\n\n3. **Customer Acquisition**: The company added 1,247 new enterprise customers, a 45% increase from Q2.",
-    citations: [
-      { id: "c1", filename: "Q3-Financial-Report.pdf", page: 3 },
-      { id: "c2", filename: "Q3-Financial-Report.pdf", page: 7 },
-    ],
-  },
-  {
-    id: "3",
-    role: "user" as const,
-    content: "How does this compare to our competitors mentioned in the market analysis?",
-  },
-  {
-    id: "4",
-    role: "assistant" as const,
-    content: "According to the Market Analysis document, your performance compares favorably:\n\n- **Revenue Growth**: Your 23% growth outpaces the industry average of 15% and competitor average of 18%.\n\n- **Cost Efficiency**: Your 8% cost reduction is notable as competitors averaged only 3% reductions.\n\n- **Market Share**: You've gained approximately 2.3% market share in Q3, moving from 12.1% to 14.4%.",
-    citations: [
-      { id: "c3", filename: "Market-Analysis-2024.pdf", page: 12 },
-      { id: "c4", filename: "Market-Analysis-2024.pdf", page: 15 },
-      { id: "c5", filename: "Q3-Financial-Report.pdf", page: 8 },
-    ],
-  },
-];
+import { trpc } from "@/lib/trpc";
 
 const mockRecentFiles = [
   { id: "f1", name: "Q3-Financial-Report.pdf", type: "pdf" },
@@ -121,17 +89,108 @@ function getInitials(firstName?: string | null, lastName?: string | null): strin
   return (first + last).toUpperCase() || "?";
 }
 
+// Helper to format time
+function formatTime(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return d.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+// Typing indicator component
+function TypingIndicator() {
+  return (
+    <div className="flex gap-4">
+      <div className="w-8 h-8 rounded-full bg-[#6c47ff] flex items-center justify-center text-sm font-medium text-white flex-shrink-0">
+        M
+      </div>
+      <div className="flex-1">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Manila</span>
+          <span className="text-xs text-zinc-400 dark:text-zinc-500">thinking...</span>
+        </div>
+        <div className="flex gap-1">
+          <span className="w-2 h-2 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '0ms' }}></span>
+          <span className="w-2 h-2 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '150ms' }}></span>
+          <span className="w-2 h-2 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '300ms' }}></span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [inputValue, setInputValue] = useState("");
   const [uploadingFiles, setUploadingFiles] = useState<UploadFile[]>([]);
   const [processingFiles, setProcessingFiles] = useState<ProcessingFile[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useUser();
 
   const userName = user?.fullName || user?.firstName || "User";
   const userEmail = user?.primaryEmailAddress?.emailAddress || "";
   const userInitials = getInitials(user?.firstName, user?.lastName);
   const userImageUrl = user?.imageUrl;
+
+  // Create or get existing conversation
+  const createConversation = trpc.chat.createConversation.useMutation();
+  const { data: messages = [], refetch: refetchMessages } = trpc.chat.getMessages.useQuery(
+    { conversationId: conversationId! },
+    { enabled: !!conversationId }
+  );
+  const sendMessage = trpc.chat.sendMessage.useMutation();
+
+  // Initialize conversation on mount
+  useEffect(() => {
+    if (!conversationId) {
+      createConversation.mutate(
+        { title: "New Conversation" },
+        {
+          onSuccess: (data) => {
+            setConversationId(data.id);
+          },
+        }
+      );
+    }
+  }, [conversationId]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isTyping]);
+
+  const handleSendMessage = async () => {
+    if (!inputValue.trim() || !conversationId) return;
+
+    const content = inputValue.trim();
+    setInputValue("");
+    setIsTyping(true);
+
+    try {
+      await sendMessage.mutateAsync({
+        conversationId,
+        content,
+      });
+
+      // Refetch messages to get the new user message and AI response
+      await refetchMessages();
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
 
   const handleFilesDropped = async (files: File[]) => {
     if (files.length === 0) return;
@@ -406,50 +465,61 @@ export default function ChatPage() {
 
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
-          {mockMessages.map((message) => (
-            <div key={message.id} className="flex gap-4">
-              {/* Avatar */}
-              <div
-                className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-medium ${
-                  message.role === "user"
-                    ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
-                    : "bg-[#6c47ff] text-white"
-                }`}
-              >
-                {message.role === "user" ? "U" : "M"}
-              </div>
+          {messages.map((message) => {
+            const metadata = message.metadata ? JSON.parse(message.metadata) : null;
+            const citations = metadata?.citations || [];
 
-              {/* Message Content */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                    {message.role === "user" ? "You" : "Manila"}
-                  </span>
-                </div>
-                <div className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">
-                  {message.content}
+            return (
+              <div key={message.id} className="flex gap-4">
+                {/* Avatar */}
+                <div
+                  className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-medium ${
+                    message.role === "user"
+                      ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
+                      : "bg-[#6c47ff] text-white"
+                  }`}
+                >
+                  {message.role === "user" ? userInitials : "M"}
                 </div>
 
-                {/* Citations */}
-                {message.role === "assistant" && message.citations && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {message.citations.map((citation) => (
-                      <button
-                        key={citation.id}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-                      >
-                        <FileIcon className="w-3 h-3" />
-                        <span>{citation.filename}</span>
-                        <span className="text-zinc-400 dark:text-zinc-500">
-                          p.{citation.page}
-                        </span>
-                      </button>
-                    ))}
+                {/* Message Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      {message.role === "user" ? "You" : "Manila"}
+                    </span>
+                    <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                      {formatTime(message.createdAt)}
+                    </span>
                   </div>
-                )}
+                  <div className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">
+                    {message.content}
+                  </div>
+
+                  {/* Citations */}
+                  {message.role === "assistant" && citations.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {citations.map((citation: any, index: number) => (
+                        <button
+                          key={index}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                        >
+                          <FileIcon className="w-3 h-3" />
+                          <span>{citation.filename}</span>
+                          <span className="text-zinc-400 dark:text-zinc-500">
+                            p.{citation.page}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
+
+          {/* Typing Indicator */}
+          {isTyping && <TypingIndicator />}
 
           {/* Upload Progress */}
           {uploadingFiles.length > 0 && (
@@ -460,6 +530,8 @@ export default function ChatPage() {
           {processingFiles.length > 0 && (
             <ProcessingStatus files={processingFiles} />
           )}
+
+          <div ref={messagesEndRef} />
         </div>
 
         {/* Input Area */}
@@ -478,14 +550,16 @@ export default function ChatPage() {
               <textarea
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder="Ask a question about your documents..."
                 rows={1}
                 className="w-full px-4 py-3 pr-12 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 resize-none focus:outline-none focus:ring-2 focus:ring-[#6c47ff]/50 focus:border-[#6c47ff]"
                 style={{ minHeight: "48px", maxHeight: "120px" }}
               />
               <button
+                onClick={handleSendMessage}
                 className="absolute right-2 bottom-2 p-2 rounded-lg bg-[#6c47ff] text-white hover:bg-[#5a3ad6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!inputValue.trim()}
+                disabled={!inputValue.trim() || !conversationId || isTyping}
               >
                 <SendIcon className="w-4 h-4" />
               </button>
