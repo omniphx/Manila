@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import { DragDropOverlay } from "../components/DragDropOverlay";
+import { uploadFile } from "../actions/upload";
 
 // Mock data
 const mockFolders = [
@@ -244,12 +246,30 @@ export default function FilesPage() {
   const [selectedFolder, setSelectedFolder] = useState("root");
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(["root"]));
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const { user } = useUser();
 
   const userName = user?.fullName || user?.firstName || "User";
   const userEmail = user?.primaryEmailAddress?.emailAddress || "";
   const userInitials = getInitials(user?.firstName, user?.lastName);
   const userImageUrl = user?.imageUrl;
+
+  const handleFilesDropped = async (files: File[]) => {
+    if (files.length === 0) return;
+
+    setIsUploading(true);
+    try {
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append("file", file);
+        await uploadFile(formData);
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   // Build folder tree
   const getFolderChildren = (parentId: string | null) =>
@@ -330,7 +350,7 @@ export default function FilesPage() {
   };
 
   return (
-    <div className="flex h-screen bg-white dark:bg-zinc-950 overflow-hidden">
+    <DragDropOverlay onFilesDropped={handleFilesDropped} className="flex h-screen bg-white dark:bg-zinc-950 overflow-hidden">
       {/* Folder Tree Sidebar */}
       <div className="w-56 flex-shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 flex flex-col">
         {/* Sidebar Header */}
@@ -563,6 +583,6 @@ export default function FilesPage() {
           </span>
         </div>
       </div>
-    </div>
+    </DragDropOverlay>
   );
 }

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import { DragDropOverlay } from "../components/DragDropOverlay";
+import { uploadFile } from "../actions/upload";
 
 // Mock data for demonstration
 const mockMessages = [
@@ -120,6 +122,7 @@ function getInitials(firstName?: string | null, lastName?: string | null): strin
 export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [inputValue, setInputValue] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
   const { user } = useUser();
 
   const userName = user?.fullName || user?.firstName || "User";
@@ -127,8 +130,25 @@ export default function ChatPage() {
   const userInitials = getInitials(user?.firstName, user?.lastName);
   const userImageUrl = user?.imageUrl;
 
+  const handleFilesDropped = async (files: File[]) => {
+    if (files.length === 0) return;
+
+    setIsUploading(true);
+    try {
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append("file", file);
+        await uploadFile(formData);
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return (
-    <div className="flex h-screen bg-white dark:bg-zinc-950 overflow-hidden">
+    <DragDropOverlay onFilesDropped={handleFilesDropped} className="flex h-screen bg-white dark:bg-zinc-950 overflow-hidden">
       {/* Sidebar */}
       <div
         className={`${
@@ -349,6 +369,6 @@ export default function ChatPage() {
           </p>
         </div>
       </div>
-    </div>
+    </DragDropOverlay>
   );
 }
