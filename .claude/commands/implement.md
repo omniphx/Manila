@@ -10,3 +10,5 @@ Implement the work in the project plan found in `/plans`.
 - After PR is complete update the plan file, compact the conversation and move on to the next task.
 - PR titles/description should contain GH ticket number
 - Close ticket after PR is merged.
+
+$ARGUMENTS
