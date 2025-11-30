@@ -10,9 +10,20 @@ export const embeddings = pgTable('embeddings', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+export const folders = pgTable('folders', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(), // Clerk user ID (e.g., user_xxxxx)
+  name: varchar('name', { length: 255 }).notNull(),
+  parentId: uuid('parent_id'), // References folders.id for nested folders
+  color: varchar('color', { length: 50 }), // Optional color for folder icon
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 export const files = pgTable('files', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: text('user_id').notNull(), // Clerk user ID (e.g., user_xxxxx)
+  folderId: uuid('folder_id'), // References folders.id
   filename: varchar('filename', { length: 255 }).notNull(),
   originalFilename: varchar('original_filename', { length: 255 }).notNull(),
   mimeType: varchar('mime_type', { length: 127 }).notNull(),
@@ -44,6 +55,8 @@ export const messages = pgTable('messages', {
 
 export type Embedding = typeof embeddings.$inferSelect;
 export type NewEmbedding = typeof embeddings.$inferInsert;
+export type Folder = typeof folders.$inferSelect;
+export type NewFolder = typeof folders.$inferInsert;
 export type File = typeof files.$inferSelect;
 export type NewFile = typeof files.$inferInsert;
 export type Conversation = typeof conversations.$inferSelect;

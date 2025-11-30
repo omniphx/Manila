@@ -7,11 +7,6 @@ import { DragDropOverlay } from "../components/DragDropOverlay";
 import { uploadFile } from "../actions/upload";
 import { trpc } from "@/lib/trpc";
 
-// Mock data for folders (we'll implement folder functionality later)
-const mockFolders = [
-  { id: "root", name: "All Files", parentId: null },
-];
-
 // Icons
 function FileIcon({ className }: { className?: string }) {
   return (
@@ -182,10 +177,12 @@ function getFileTypeIcon(type: string) {
 
 export default function FilesPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [selectedFolder, setSelectedFolder] = useState("root");
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(["root"]));
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [showNewFolderModal, setShowNewFolderModal] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useUser();
   const utils = trpc.useUtils();
@@ -196,6 +193,20 @@ export default function FilesPage() {
     offset: 0,
   }, {
     retry: false, // Don't retry on auth errors
+  });
+
+  // Fetch folders from backend
+  const { data: foldersData } = trpc.folders.list.useQuery({
+    parentId: undefined, // Get all folders
+  });
+
+  // Create folder mutation
+  const createFolderMutation = trpc.folders.create.useMutation({
+    onSuccess: () => {
+      utils.folders.list.invalidate();
+      setShowNewFolderModal(false);
+      setNewFolderName("");
+    },
   });
 
   const userName = user?.fullName || user?.firstName || "User";
@@ -238,20 +249,35 @@ export default function FilesPage() {
     }
   };
 
-  // Build folder tree
-  const getFolderChildren = (parentId: string | null) =>
-    mockFolders.filter((f) => f.parentId === parentId);
+  // Handle new folder creation
+  const handleCreateFolder = () => {
+    if (!newFolderName.trim()) return;
+    createFolderMutation.mutate({
+      name: newFolderName.trim(),
+      parentId: selectedFolder || undefined,
+    });
+  };
 
-  // Convert backend files to display format
-  const displayFiles = (filesData || []).map((file) => ({
+  // Build folder tree from backend data
+  const folders = foldersData || [];
+  const getFolderChildren = (parentId: string | null) =>
+    folders.filter((f) => f.parentId === parentId);
+
+  // Convert backend files to display format and filter by selected folder
+  const allDisplayFiles = (filesData || []).map((file) => ({
     id: file.id,
     name: file.originalFilename,
     type: file.mimeType.split("/")[1] || "unknown",
     size: parseInt(file.size),
-    folderId: "root",
+    folderId: file.folderId,
     processingStatus: file.processingStatus as "pending" | "processing" | "completed" | "failed",
     createdAt: new Date(file.createdAt).toISOString(),
   }));
+
+  // Filter files based on selected folder
+  const displayFiles = selectedFolder
+    ? allDisplayFiles.filter((f) => f.folderId === selectedFolder)
+    : allDisplayFiles.filter((f) => !f.folderId); // Show files without folder when no folder selected
 
   const toggleFolder = (folderId: string) => {
     const newExpanded = new Set(expandedFolders);
@@ -264,11 +290,14 @@ export default function FilesPage() {
   };
 
   const getBreadcrumbs = () => {
-    const crumbs: { id: string; name: string }[] = [];
-    let current = mockFolders.find((f) => f.id === selectedFolder);
+    if (!selectedFolder) {
+      return [{ id: null, name: "All Files" }];
+    }
+    const crumbs: { id: string | null; name: string }[] = [{ id: null, name: "All Files" }];
+    let current = folders.find((f) => f.id === selectedFolder);
     while (current) {
-      crumbs.unshift(current);
-      current = mockFolders.find((f) => f.id === current!.parentId);
+      crumbs.push({ id: current.id, name: current.name });
+      current = folders.find((f) => f.id === current!.parentId);
     }
     return crumbs;
   };
@@ -333,7 +362,10 @@ export default function FilesPage() {
 
         {/* New Folder Button */}
         <div className="p-2 border-b border-zinc-200 dark:border-zinc-800">
-          <button className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-[#6c47ff] hover:text-[#6c47ff] transition-colors text-sm">
+          <button
+            onClick={() => setShowNewFolderModal(true)}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-[#6c47ff] hover:text-[#6c47ff] transition-colors text-sm"
+          >
             <PlusIcon className="w-4 h-4" />
             New Folder
           </button>
@@ -341,6 +373,23 @@ export default function FilesPage() {
 
         {/* Folder Tree */}
         <div className="flex-1 overflow-y-auto p-2">
+          {/* All Files */}
+          <button
+            onClick={() => setSelectedFolder(null)}
+            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors mb-1 ${
+              selectedFolder === null
+                ? "bg-[#6c47ff]/10 text-[#6c47ff]"
+                : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            }`}
+          >
+            <span className="w-4" />
+            {selectedFolder === null ? (
+              <FolderOpenIcon className="w-4 h-4 flex-shrink-0 text-[#6c47ff]" />
+            ) : (
+              <FolderIcon className="w-4 h-4 flex-shrink-0 text-zinc-400" />
+            )}
+            <span className="text-sm truncate">All Files</span>
+          </button>
           {renderFolderTree(null)}
         </div>
 
@@ -383,7 +432,7 @@ export default function FilesPage() {
             {/* Breadcrumbs */}
             <nav className="flex items-center gap-1 text-sm">
               {getBreadcrumbs().map((crumb, index, arr) => (
-                <span key={crumb.id} className="flex items-center gap-1">
+                <span key={crumb.id || "root"} className="flex items-center gap-1">
                   <button
                     onClick={() => setSelectedFolder(crumb.id)}
                     className={`hover:text-[#6c47ff] transition-colors ${
@@ -585,6 +634,47 @@ export default function FilesPage() {
           </span>
         </div>
       </div>
+
+      {/* New Folder Modal */}
+      {showNewFolderModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowNewFolderModal(false)}>
+          <div
+            className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl p-6 w-full max-w-md mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+              Create New Folder
+            </h2>
+            <input
+              type="text"
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleCreateFolder();
+                if (e.key === "Escape") setShowNewFolderModal(false);
+              }}
+              placeholder="Folder name"
+              autoFocus
+              className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#6c47ff] focus:border-transparent"
+            />
+            <div className="flex items-center justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowNewFolderModal(false)}
+                className="px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateFolder}
+                disabled={!newFolderName.trim() || createFolderMutation.isPending}
+                className="px-4 py-2 bg-[#6c47ff] text-white rounded-md text-sm font-medium hover:bg-[#5a3ad6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {createFolderMutation.isPending ? "Creating..." : "Create"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DragDropOverlay>
   );
 }
