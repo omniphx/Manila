@@ -5,7 +5,9 @@ export const embeddings = pgTable('embeddings', {
   userId: text('user_id').notNull(), // Clerk user ID (e.g., user_xxxxx)
   fileId: uuid('file_id'), // References files.id - null if embedding is not from a file
   content: text('content').notNull(), // The text chunk that was embedded
+  contentHash: varchar('content_hash', { length: 64 }), // SHA-256 hash for deduplication
   embedding: vector('embedding', { dimensions: 1536 }).notNull(),
+  embeddingModel: varchar('embedding_model', { length: 100 }).notNull(), // e.g., 'text-embedding-3-small'
   metadata: text('metadata'), // JSON string: { chunkIndex: number, totalChunks: number, startPos: number, endPos: number }
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

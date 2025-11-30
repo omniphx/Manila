@@ -1,9 +1,22 @@
 import { embedMany } from 'ai';
 import { eq } from 'drizzle-orm';
 import { createOpenAI } from '@ai-sdk/openai';
+import { createHash } from 'crypto';
 import { db } from '../lib/db.js';
 import { embeddings } from '../db/schema.js';
 import { env } from '../lib/env.js';
+
+// Embedding model configuration
+const EMBEDDING_MODEL = 'text-embedding-3-small' as const;
+
+/**
+ * Chunk with position tracking
+ */
+interface Chunk {
+  text: string;
+  startPos: number;
+  endPos: number;
+}
 
 /**
  * Chunk metadata stored in the database
@@ -40,17 +53,18 @@ const CHUNK_CONFIG = {
  * - Split on sentence boundaries when possible (periods, newlines)
  * - Overlap chunks to preserve context across boundaries
  * - Target ~1000 tokens per chunk (conservative for text-embedding-3-small's 8191 limit)
+ * - Track actual positions in the original text for each chunk
  */
-function chunkText(text: string): string[] {
+function chunkText(text: string): Chunk[] {
   const maxChars = CHUNK_CONFIG.maxChunkSize * CHUNK_CONFIG.estimatedCharsPerToken;
   const overlapChars = CHUNK_CONFIG.chunkOverlap * CHUNK_CONFIG.estimatedCharsPerToken;
 
   // If text is small enough, return as single chunk
   if (text.length <= maxChars) {
-    return [text];
+    return [{ text, startPos: 0, endPos: text.length }];
   }
 
-  const chunks: string[] = [];
+  const chunks: Chunk[] = [];
   let startPos = 0;
 
   while (startPos < text.length) {
@@ -73,7 +87,12 @@ function chunkText(text: string): string[] {
       }
     }
 
-    chunks.push(text.substring(startPos, endPos));
+    // Store chunk with its actual position
+    chunks.push({
+      text: text.substring(startPos, endPos),
+      startPos,
+      endPos,
+    });
 
     // Move start position forward, with overlap
     // Ensure we always advance by at least 1 character to prevent infinite loops
@@ -116,6 +135,26 @@ export async function generateEmbeddings(
       };
     }
 
+    // Check if embeddings already exist for this file
+    const existingEmbeddings = await db
+      .select({ id: embeddings.id })
+      .from(embeddings)
+      .where(eq(embeddings.fileId, fileId))
+      .limit(1);
+
+    if (existingEmbeddings.length > 0) {
+      console.log(`Embeddings already exist for file ${fileId}, skipping`);
+      const allEmbeddings = await db
+        .select({ id: embeddings.id })
+        .from(embeddings)
+        .where(eq(embeddings.fileId, fileId));
+
+      return {
+        success: true,
+        embeddingIds: allEmbeddings.map((e) => e.id),
+      };
+    }
+
     // Step 1: Chunk the text
     const chunks = chunkText(content);
     console.log(`Chunked content into ${chunks.length} chunks for file ${fileId}`);
@@ -125,51 +164,42 @@ export async function generateEmbeddings(
       apiKey: env.OPENAI_API_KEY,
     });
 
-    const embeddingModel = openai.embedding('text-embedding-3-small');
+    const embeddingModel = openai.embedding(EMBEDDING_MODEL);
 
     const { embeddings: embeddingVectors } = await embedMany({
       model: embeddingModel,
-      values: chunks,
+      values: chunks.map((c) => c.text),
     });
 
-    const embeddingResults = chunks.map((chunk, index) => ({
-      chunk,
-      embedding: embeddingVectors[index],
-      index,
-    }));
-
-    // Step 3: Store embeddings in database
+    // Step 3: Prepare all values for batch insert
     const totalChunks = chunks.length;
-    const insertedEmbeddings = await Promise.all(
-      embeddingResults.map(async ({ chunk, embedding, index }) => {
-        // Calculate character positions
-        let startPos = 0;
-        for (let i = 0; i < index; i++) {
-          startPos += chunks[i].length;
-        }
-        const endPos = startPos + chunk.length;
+    const valuesToInsert = chunks.map((chunk, index) => {
+      const metadata: ChunkMetadata = {
+        chunkIndex: index,
+        totalChunks,
+        startPos: chunk.startPos,
+        endPos: chunk.endPos,
+      };
 
-        const metadata: ChunkMetadata = {
-          chunkIndex: index,
-          totalChunks,
-          startPos,
-          endPos,
-        };
+      // Generate content hash for deduplication
+      const contentHash = createHash('sha256').update(chunk.text).digest('hex');
 
-        const [inserted] = await db
-          .insert(embeddings)
-          .values({
-            userId,
-            fileId,
-            content: chunk,
-            embedding,
-            metadata: JSON.stringify(metadata),
-          })
-          .returning();
+      return {
+        userId,
+        fileId,
+        content: chunk.text,
+        contentHash,
+        embedding: embeddingVectors[index],
+        embeddingModel: EMBEDDING_MODEL,
+        metadata: JSON.stringify(metadata),
+      };
+    });
 
-        return inserted.id;
-      })
-    );
+    // Step 4: Batch insert all embeddings
+    const insertedEmbeddings = await db
+      .insert(embeddings)
+      .values(valuesToInsert)
+      .returning({ id: embeddings.id });
 
     console.log(
       `Generated ${insertedEmbeddings.length} embeddings for file ${fileId}`
@@ -177,7 +207,7 @@ export async function generateEmbeddings(
 
     return {
       success: true,
-      embeddingIds: insertedEmbeddings,
+      embeddingIds: insertedEmbeddings.map((e) => e.id),
     };
   } catch (error) {
     console.error('Error generating embeddings:', error);

@@ -50,6 +50,13 @@
       "when": 1764534635752,
       "tag": "0006_past_onslaught",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1764539674149,
+      "tag": "0007_eager_sandman",
+      "breakpoints": true
     }
   ]
 }

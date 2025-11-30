@@ -195,6 +195,15 @@ export default function FilesPage() {
     offset: 0,
   }, {
     retry: false, // Don't retry on auth errors
+    refetchInterval: (data) => {
+      // Poll every 2 seconds if any files are processing
+      if (!data || !Array.isArray(data)) return false;
+
+      const hasProcessingFiles = data.some(
+        (file) => file.processingStatus === 'processing' || file.processingStatus === 'pending'
+      );
+      return hasProcessingFiles ? 2000 : false;
+    },
   });
 
   // Fetch folders from backend
