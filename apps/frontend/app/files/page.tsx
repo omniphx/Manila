@@ -183,6 +183,8 @@ export default function FilesPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [draggedFileId, setDraggedFileId] = useState<string | null>(null);
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useUser();
   const utils = trpc.useUtils();
@@ -206,6 +208,13 @@ export default function FilesPage() {
       utils.folders.list.invalidate();
       setShowNewFolderModal(false);
       setNewFolderName("");
+    },
+  });
+
+  // Move file mutation
+  const moveFileMutation = trpc.files.move.useMutation({
+    onSuccess: () => {
+      utils.files.list.invalidate();
     },
   });
 
@@ -256,6 +265,48 @@ export default function FilesPage() {
       name: newFolderName.trim(),
       parentId: selectedFolder || undefined,
     });
+  };
+
+  // Handle file drag start
+  const handleFileDragStart = (e: React.DragEvent, fileId: string) => {
+    setDraggedFileId(fileId);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  // Handle file drag end
+  const handleFileDragEnd = () => {
+    setDraggedFileId(null);
+    setDragOverFolderId(null);
+  };
+
+  // Handle folder drag over
+  const handleFolderDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  // Handle folder drag enter
+  const handleFolderDragEnter = (folderId: string | null) => {
+    setDragOverFolderId(folderId === null ? "root" : folderId);
+  };
+
+  // Handle folder drag leave
+  const handleFolderDragLeave = () => {
+    setDragOverFolderId(null);
+  };
+
+  // Handle drop on folder
+  const handleFolderDrop = (e: React.DragEvent, folderId: string | null) => {
+    e.preventDefault();
+    if (!draggedFileId) return;
+
+    moveFileMutation.mutate({
+      fileId: draggedFileId,
+      folderId,
+    });
+
+    setDraggedFileId(null);
+    setDragOverFolderId(null);
   };
 
   // Build folder tree from backend data
@@ -317,11 +368,15 @@ export default function FilesPage() {
               setSelectedFolder(folder.id);
               if (hasChildren) toggleFolder(folder.id);
             }}
+            onDragOver={handleFolderDragOver}
+            onDragEnter={() => handleFolderDragEnter(folder.id)}
+            onDragLeave={handleFolderDragLeave}
+            onDrop={(e) => handleFolderDrop(e, folder.id)}
             className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors ${
               isSelected
                 ? "bg-[#6c47ff]/10 text-[#6c47ff]"
                 : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            }`}
+            } ${dragOverFolderId === folder.id ? "bg-[#6c47ff]/20 ring-2 ring-[#6c47ff]" : ""}`}
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
           >
             {hasChildren ? (
@@ -377,11 +432,15 @@ export default function FilesPage() {
           {/* All Files */}
           <button
             onClick={() => setSelectedFolder(null)}
+            onDragOver={handleFolderDragOver}
+            onDragEnter={() => handleFolderDragEnter(null)}
+            onDragLeave={handleFolderDragLeave}
+            onDrop={(e) => handleFolderDrop(e, null)}
             className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors mb-1 ${
               selectedFolder === null
                 ? "bg-[#6c47ff]/10 text-[#6c47ff]"
                 : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            }`}
+            } ${dragOverFolderId === "root" ? "bg-[#6c47ff]/20 ring-2 ring-[#6c47ff]" : ""}`}
           >
             <span className="w-4" />
             {selectedFolder === null ? (
@@ -537,12 +596,15 @@ export default function FilesPage() {
               {displayFiles.map((file) => (
                 <div
                   key={file.id}
+                  draggable
+                  onDragStart={(e) => handleFileDragStart(e, file.id)}
+                  onDragEnd={handleFileDragEnd}
                   onClick={() => setSelectedFile(file.id === selectedFile ? null : file.id)}
-                  className={`group relative p-4 rounded-lg border transition-all cursor-pointer ${
+                  className={`group relative p-4 rounded-lg border transition-all cursor-move ${
                     selectedFile === file.id
                       ? "border-[#6c47ff] bg-[#6c47ff]/5"
                       : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-900"
-                  }`}
+                  } ${draggedFileId === file.id ? "opacity-50" : ""}`}
                 >
                   {/* File Icon */}
                   <div className="flex justify-center mb-3">
@@ -591,12 +653,15 @@ export default function FilesPage() {
               {displayFiles.map((file) => (
                 <div
                   key={file.id}
+                  draggable
+                  onDragStart={(e) => handleFileDragStart(e, file.id)}
+                  onDragEnd={handleFileDragEnd}
                   onClick={() => setSelectedFile(file.id === selectedFile ? null : file.id)}
-                  className={`group grid grid-cols-12 gap-4 px-4 py-3 rounded-lg items-center transition-colors cursor-pointer ${
+                  className={`group grid grid-cols-12 gap-4 px-4 py-3 rounded-lg items-center transition-colors cursor-move ${
                     selectedFile === file.id
                       ? "bg-[#6c47ff]/5 border border-[#6c47ff]"
                       : "hover:bg-zinc-50 dark:hover:bg-zinc-900"
-                  }`}
+                  } ${draggedFileId === file.id ? "opacity-50" : ""}`}
                 >
                   <div className="col-span-5 flex items-center gap-3 min-w-0">
                     <FileIcon className={`w-5 h-5 flex-shrink-0 ${getFileTypeIcon(file.type)}`} />

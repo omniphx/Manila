@@ -154,4 +154,39 @@ export const filesRouter = router({
         id: input.id,
       };
     }),
+
+  move: protectedProcedure
+    .input(
+      z.object({
+        fileId: z.string().uuid(),
+        folderId: z.string().uuid().nullable(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [file] = await ctx.db
+        .select()
+        .from(files)
+        .where(eq(files.id, input.fileId))
+        .limit(1);
+
+      if (!file || file.userId !== ctx.user.userId) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'File not found',
+        });
+      }
+
+      // Update the folderId
+      const [updatedFile] = await ctx.db
+        .update(files)
+        .set({ folderId: input.folderId })
+        .where(eq(files.id, input.fileId))
+        .returning();
+
+      return {
+        success: true,
+        id: updatedFile.id,
+        folderId: updatedFile.folderId,
+      };
+    }),
 });
