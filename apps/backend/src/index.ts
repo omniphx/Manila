@@ -236,6 +236,11 @@ async function main() {
           });
         }
 
+        // Get folderId from form fields if provided
+        server.log.info({ fields: data.fields }, 'Upload fields received');
+        const folderId = data.fields.folderId ? String((data.fields.folderId as any).value) : null;
+        server.log.info({ folderId }, 'Parsed folderId');
+
         // Validate file type
         if (!isAllowedMimeType(data.mimetype)) {
           return reply.code(400).send({
@@ -262,6 +267,7 @@ async function main() {
           .insert(files)
           .values({
             userId: auth.userId,
+            folderId: folderId || null,
             filename: uniqueFilename,
             originalFilename: data.filename,
             mimeType: data.mimetype,

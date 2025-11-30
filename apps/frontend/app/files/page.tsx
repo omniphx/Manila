@@ -222,7 +222,7 @@ export default function FilesPage() {
       for (const file of files) {
         const formData = new FormData();
         formData.append("file", file);
-        const result = await uploadFile(formData);
+        const result = await uploadFile(formData, selectedFolder);
         if (!result.success) {
           console.error("Upload error:", result.error);
         }
@@ -293,12 +293,13 @@ export default function FilesPage() {
     if (!selectedFolder) {
       return [{ id: null, name: "All Files" }];
     }
-    const crumbs: { id: string | null; name: string }[] = [{ id: null, name: "All Files" }];
+    const crumbs: { id: string | null; name: string }[] = [];
     let current = folders.find((f) => f.id === selectedFolder);
     while (current) {
-      crumbs.push({ id: current.id, name: current.name });
+      crumbs.unshift({ id: current.id, name: current.name });
       current = folders.find((f) => f.id === current!.parentId);
     }
+    crumbs.unshift({ id: null, name: "All Files" });
     return crumbs;
   };
 

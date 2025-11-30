@@ -77,6 +77,7 @@ export const filesRouter = router({
       const results = await ctx.db
         .select({
           id: files.id,
+          folderId: files.folderId,
           filename: files.filename,
           originalFilename: files.originalFilename,
           mimeType: files.mimeType,
