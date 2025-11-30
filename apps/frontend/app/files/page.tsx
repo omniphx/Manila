@@ -1,76 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { DragDropOverlay } from "../components/DragDropOverlay";
 import { uploadFile } from "../actions/upload";
+import { trpc } from "@/lib/trpc";
 
-// Mock data
+// Mock data for folders (we'll implement folder functionality later)
 const mockFolders = [
   { id: "root", name: "All Files", parentId: null },
-  { id: "f1", name: "Financial Reports", parentId: "root" },
-  { id: "f2", name: "Marketing", parentId: "root" },
-  { id: "f3", name: "Product", parentId: "root" },
-  { id: "f4", name: "Q3 2024", parentId: "f1" },
-  { id: "f5", name: "Q4 2024", parentId: "f1" },
-];
-
-const mockFiles = [
-  {
-    id: "file1",
-    name: "Q3-Financial-Report.pdf",
-    type: "pdf",
-    size: 2457600,
-    folderId: "f4",
-    processingStatus: "completed" as const,
-    createdAt: "2024-10-15T10:30:00Z",
-  },
-  {
-    id: "file2",
-    name: "Q3-Revenue-Analysis.xlsx",
-    type: "xlsx",
-    size: 156000,
-    folderId: "f4",
-    processingStatus: "completed" as const,
-    createdAt: "2024-10-14T14:22:00Z",
-  },
-  {
-    id: "file3",
-    name: "Market-Analysis-2024.pdf",
-    type: "pdf",
-    size: 3840000,
-    folderId: "f2",
-    processingStatus: "processing" as const,
-    createdAt: "2024-10-18T09:15:00Z",
-  },
-  {
-    id: "file4",
-    name: "Product-Roadmap.docx",
-    type: "docx",
-    size: 89000,
-    folderId: "f3",
-    processingStatus: "completed" as const,
-    createdAt: "2024-10-12T16:45:00Z",
-  },
-  {
-    id: "file5",
-    name: "Customer-Feedback-Summary.txt",
-    type: "txt",
-    size: 24000,
-    folderId: "f3",
-    processingStatus: "pending" as const,
-    createdAt: "2024-10-19T11:00:00Z",
-  },
-  {
-    id: "file6",
-    name: "Brand-Guidelines.pdf",
-    type: "pdf",
-    size: 5120000,
-    folderId: "f2",
-    processingStatus: "failed" as const,
-    createdAt: "2024-10-17T08:30:00Z",
-  },
 ];
 
 // Icons
@@ -247,7 +186,17 @@ export default function FilesPage() {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(["root"]));
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useUser();
+  const utils = trpc.useUtils();
+
+  // Fetch files from backend using tRPC
+  const { data: filesData, isLoading, error } = trpc.files.list.useQuery({
+    limit: 100,
+    offset: 0,
+  }, {
+    retry: false, // Don't retry on auth errors
+  });
 
   const userName = user?.fullName || user?.firstName || "User";
   const userEmail = user?.primaryEmailAddress?.emailAddress || "";
@@ -262,8 +211,13 @@ export default function FilesPage() {
       for (const file of files) {
         const formData = new FormData();
         formData.append("file", file);
-        await uploadFile(formData);
+        const result = await uploadFile(formData);
+        if (!result.success) {
+          console.error("Upload error:", result.error);
+        }
       }
+      // Refetch files after upload
+      await utils.files.list.invalidate();
     } catch (error) {
       console.error("Upload error:", error);
     } finally {
@@ -271,20 +225,33 @@ export default function FilesPage() {
     }
   };
 
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      await handleFilesDropped(Array.from(files));
+      // Reset input
+      e.target.value = "";
+    }
+  };
+
   // Build folder tree
   const getFolderChildren = (parentId: string | null) =>
     mockFolders.filter((f) => f.parentId === parentId);
 
-  const getFilesInFolder = (folderId: string) => {
-    // For "All Files" (root), show files that would be at root level
-    if (folderId === "root") {
-      return mockFiles.filter((f) => !f.folderId || f.folderId === "root");
-    }
-    return mockFiles.filter((f) => f.folderId === folderId);
-  };
-
-  // For demo, show all files when viewing root
-  const displayFiles = selectedFolder === "root" ? mockFiles : getFilesInFolder(selectedFolder);
+  // Convert backend files to display format
+  const displayFiles = (filesData || []).map((file) => ({
+    id: file.id,
+    name: file.originalFilename,
+    type: file.mimeType.split("/")[1] || "unknown",
+    size: parseInt(file.size),
+    folderId: "root",
+    processingStatus: file.processingStatus as "pending" | "processing" | "completed" | "failed",
+    createdAt: new Date(file.createdAt).toISOString(),
+  }));
 
   const toggleFolder = (folderId: string) => {
     const newExpanded = new Set(expandedFolders);
@@ -461,22 +428,57 @@ export default function FilesPage() {
             </div>
 
             {/* Upload Button */}
-            <button className="flex items-center gap-2 px-4 py-2 bg-[#6c47ff] text-white rounded-full text-sm font-medium hover:bg-[#5a3ad6] transition-colors">
+            <button
+              onClick={handleUploadClick}
+              disabled={isUploading}
+              className="flex items-center gap-2 px-4 py-2 bg-[#6c47ff] text-white rounded-full text-sm font-medium hover:bg-[#5a3ad6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <UploadIcon className="w-4 h-4" />
-              Upload
+              {isUploading ? "Uploading..." : "Upload"}
             </button>
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={handleFileInputChange}
+              className="hidden"
+              accept=".pdf,.doc,.docx,.txt,.xlsx,.xls"
+            />
           </div>
         </div>
 
         {/* File Grid/List */}
         <div className="flex-1 overflow-y-auto p-6">
-          {displayFiles.length === 0 ? (
+          {error ? (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center mb-4">
+                <span className="text-2xl">⚠️</span>
+              </div>
+              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">
+                {error.message || "Failed to load files"}
+              </p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Please sign in to view your files
+              </p>
+            </div>
+          ) : isLoading ? (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <div className="w-12 h-12 rounded-full border-4 border-zinc-200 border-t-[#6c47ff] animate-spin mb-4" />
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                Loading files...
+              </p>
+            </div>
+          ) : displayFiles.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-center">
               <FolderIcon className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mb-4" />
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                No files in this folder
+                No files uploaded yet
               </p>
-              <button className="mt-4 text-sm text-[#6c47ff] hover:text-[#5a3ad6] font-medium">
+              <button
+                onClick={handleUploadClick}
+                className="mt-4 text-sm text-[#6c47ff] hover:text-[#5a3ad6] font-medium"
+              >
                 Upload your first file
               </button>
             </div>
