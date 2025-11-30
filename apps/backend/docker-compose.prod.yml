@@ -1,17 +1,50 @@
-# Production-specific Docker Compose configuration
-# This file extends docker-compose.yml with production settings
-# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up
+# Production Docker Compose configuration
+# Complete stack with PostgreSQL and backend for production deployment
+# Usage: pnpm docker:prod
 
 version: "3.8"
 
 services:
-  postgres: {}
+  postgres:
+    image: ankane/pgvector:latest
+    container_name: manila-postgres-prod
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-manila}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
 
   backend:
     build:
+      context: ../..
+      dockerfile: apps/backend/Dockerfile
       target: production
-    # No volumes in production - use the built image
-    # Override the base command to use the Dockerfile's production CMD
-    # This overrides the dev default from docker-compose.yml
-    command: ["node", "apps/backend/dist/index.js"]
+    container_name: manila-backend-prod
+    env_file:
+      - .env
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: ${PORT:-3000}
+      HOST: ${HOST:-0.0.0.0}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-manila}
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: always
+
+volumes:
+  postgres_data:
