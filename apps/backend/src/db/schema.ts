@@ -3,9 +3,10 @@ import { pgTable, uuid, varchar, timestamp, text, vector } from 'drizzle-orm/pg-
 export const embeddings = pgTable('embeddings', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: text('user_id').notNull(), // Clerk user ID (e.g., user_xxxxx)
-  content: text('content').notNull(),
+  fileId: uuid('file_id'), // References files.id - null if embedding is not from a file
+  content: text('content').notNull(), // The text chunk that was embedded
   embedding: vector('embedding', { dimensions: 1536 }).notNull(),
-  metadata: text('metadata'),
+  metadata: text('metadata'), // JSON string: { chunkIndex: number, totalChunks: number, startPos: number, endPos: number }
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
