@@ -3,6 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure } from '../trpc.js';
 import { conversations, messages } from '../../db/schema.js';
 import { eq, desc } from 'drizzle-orm';
+import { generateChatResponse, generateCitations } from '../../services/llm.js';
 
 export const chatRouter = router({
   // Create a new conversation
@@ -87,14 +88,45 @@ export const chatRouter = router({
         })
         .returning();
 
+      // Get conversation history (last 10 messages)
+      const conversationHistory = await ctx.db
+        .select()
+        .from(messages)
+        .where(eq(messages.conversationId, input.conversationId))
+        .orderBy(desc(messages.createdAt))
+        .limit(10);
+
+      // Reverse to get chronological order and exclude the just-added user message
+      const historyForLLM = conversationHistory
+        .reverse()
+        .slice(0, -1)
+        .map((msg) => ({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+        }));
+
       // Get user's files for context
       const userFiles = await ctx.db.query.files.findMany({
         where: (files, { eq }) => eq(files.userId, ctx.user.userId),
       });
 
-      // TODO: Implement AI response generation using embeddings
-      // For now, return a placeholder response
-      const aiResponseContent = `I understand you're asking: "${input.content}". This is a placeholder response. In the future, I'll search through your ${userFiles.length} uploaded document(s) and provide relevant answers with citations.`;
+      // Prepare document context
+      const documentContext = userFiles
+        .filter((file) => file.extractedContent)
+        .map((file) => ({
+          filename: file.originalFilename,
+          content: file.extractedContent || '',
+        }));
+
+      // Generate AI response using Claude
+      const aiResponseContent = await generateChatResponse(
+        input.content,
+        historyForLLM,
+        documentContext
+      );
+
+      // Generate citations (placeholder implementation)
+      const citations = await generateCitations(aiResponseContent, documentContext);
 
       // Save AI response
       const [assistantMessage] = await ctx.db
@@ -103,7 +135,7 @@ export const chatRouter = router({
           conversationId: input.conversationId,
           role: 'assistant',
           content: aiResponseContent,
-          metadata: JSON.stringify({ citations: [] }),
+          metadata: JSON.stringify({ citations }),
         })
         .returning();
 

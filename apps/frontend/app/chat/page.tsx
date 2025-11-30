@@ -365,6 +365,28 @@ export default function ChatPage() {
           </button>
         </div>
 
+        {/* New Chat Button */}
+        <div className="p-2 border-b border-zinc-200 dark:border-zinc-800">
+          <button
+            onClick={() => {
+              createConversation.mutate(
+                { title: "New Conversation" },
+                {
+                  onSuccess: (data) => {
+                    setConversationId(data.id);
+                  },
+                }
+              );
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-md transition-colors bg-[#6c47ff] text-white hover:bg-[#5a3ad6]"
+          >
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            {sidebarOpen && <span className="text-sm font-medium">New Chat</span>}
+          </button>
+        </div>
+
         {/* View Toggle */}
         <div className="p-2 border-b border-zinc-200 dark:border-zinc-800">
           <div className="flex flex-col gap-1">
@@ -384,21 +406,24 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Recent Files (when sidebar is open) */}
+        {/* Recent Conversations (when sidebar is open) */}
         {sidebarOpen && (
           <div className="flex-1 overflow-y-auto p-3">
             <h3 className="text-xs font-semibold text-zinc-500 dark:text-zinc-500 uppercase tracking-wider mb-2">
-              Recent Files
+              Recent Conversations
             </h3>
             <div className="space-y-1">
-              {mockRecentFiles.map((file) => (
+              {conversations.map((conv) => (
                 <button
-                  key={file.id}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors group"
+                  key={conv.id}
+                  onClick={() => setConversationId(conv.id)}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors group ${
+                    conv.id === conversationId ? 'bg-zinc-200 dark:bg-zinc-800' : ''
+                  }`}
                 >
-                  <FileIcon className="w-4 h-4 text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 flex-shrink-0" />
+                  <ChatIcon className="w-4 h-4 text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 flex-shrink-0" />
                   <span className="text-sm text-zinc-700 dark:text-zinc-300 truncate">
-                    {file.name}
+                    {conv.title || 'New Conversation'}
                   </span>
                 </button>
               ))}
@@ -406,17 +431,20 @@ export default function ChatPage() {
           </div>
         )}
 
-        {/* Collapsed state - just show file icons */}
+        {/* Collapsed state - just show chat icons */}
         {!sidebarOpen && (
           <div className="flex-1 overflow-y-auto p-2">
             <div className="space-y-1">
-              {mockRecentFiles.slice(0, 5).map((file) => (
+              {conversations.slice(0, 5).map((conv) => (
                 <button
-                  key={file.id}
-                  className="w-full flex items-center justify-center p-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
-                  title={file.name}
+                  key={conv.id}
+                  onClick={() => setConversationId(conv.id)}
+                  className={`w-full flex items-center justify-center p-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors ${
+                    conv.id === conversationId ? 'bg-zinc-200 dark:bg-zinc-800' : ''
+                  }`}
+                  title={conv.title || 'New Conversation'}
                 >
-                  <FileIcon className="w-4 h-4 text-zinc-400" />
+                  <ChatIcon className="w-4 h-4 text-zinc-400" />
                 </button>
               ))}
             </div>
