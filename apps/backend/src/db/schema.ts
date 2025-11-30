@@ -32,6 +32,7 @@ export const files = pgTable('files', {
   mimeType: varchar('mime_type', { length: 127 }).notNull(),
   size: varchar('size', { length: 50 }).notNull(),
   path: text('path').notNull(),
+  contentHash: varchar('content_hash', { length: 64 }), // SHA-256 hash of file content for deduplication
   extractedContent: text('extracted_content'),
   processingStatus: varchar('processing_status', { length: 50 }).notNull().default('pending'), // pending, processing, completed, failed
   processingError: text('processing_error'),

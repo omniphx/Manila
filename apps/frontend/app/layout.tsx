@@ -7,6 +7,7 @@ import {
 import { type Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import { Toaster } from "sonner";
 import "./globals.css";
 import { TRPCProvider } from "./providers/trpc-provider";
 
@@ -37,6 +38,7 @@ export default function RootLayout({
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
           <TRPCProvider>
+            <Toaster position="top-right" richColors />
             {/* Header only shown for signed-out users */}
             <SignedOut>
               <header className="flex justify-between items-center px-6 py-4 max-w-6xl mx-auto">

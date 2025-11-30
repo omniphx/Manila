@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import { toast } from "sonner";
 import { DragDropOverlay } from "../components/DragDropOverlay";
 import { uploadFile } from "../actions/upload";
 import { trpc } from "@/lib/trpc";
@@ -242,13 +243,30 @@ export default function FilesPage() {
         formData.append("file", file);
         const result = await uploadFile(formData, selectedFolder);
         if (!result.success) {
+          // Check if it's a duplicate file error (409)
+          if (result.error && result.error.includes("already exists")) {
+            toast.error("Duplicate file", {
+              description: result.error,
+            });
+          } else {
+            toast.error("Upload failed", {
+              description: result.error || "An unknown error occurred",
+            });
+          }
           console.error("Upload error:", result.error);
+        } else {
+          toast.success("File uploaded", {
+            description: `${file.name} has been uploaded successfully`,
+          });
         }
       }
       // Refetch files after upload
       await utils.files.list.invalidate();
     } catch (error) {
       console.error("Upload error:", error);
+      toast.error("Upload failed", {
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+      });
     } finally {
       setIsUploading(false);
     }
