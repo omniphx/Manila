@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure } from '../trpc.js';
-import { embeddings } from '../../db/schema.js';
+import { embeddings, files } from '../../db/schema.js';
 import { eq, sql } from 'drizzle-orm';
 
 export const embeddingsRouter = router({
@@ -48,12 +48,15 @@ export const embeddingsRouter = router({
       let query = ctx.db
         .select({
           id: embeddings.id,
+          fileId: embeddings.fileId,
           content: embeddings.content,
           metadata: embeddings.metadata,
           createdAt: embeddings.createdAt,
           similarity: sql<number>`1 - (${embeddings.embedding} <=> ${embeddingString}::vector)`,
+          filename: files.originalFilename,
         })
         .from(embeddings)
+        .leftJoin(files, eq(embeddings.fileId, files.id))
         .where(eq(embeddings.userId, ctx.user.userId))
         .orderBy(sql`${embeddings.embedding} <=> ${embeddingString}::vector`)
         .limit(input.limit);

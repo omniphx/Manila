@@ -3,7 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure } from '../trpc.js';
 import { conversations, messages } from '../../db/schema.js';
 import { eq, desc } from 'drizzle-orm';
-import { generateChatResponse, generateCitations } from '../../services/llm.js';
+import { askQuestion } from '../../services/rag.js';
 
 export const chatRouter = router({
   // Create a new conversation
@@ -88,54 +88,25 @@ export const chatRouter = router({
         })
         .returning();
 
-      // Get conversation history (last 10 messages)
-      const conversationHistory = await ctx.db
-        .select()
-        .from(messages)
-        .where(eq(messages.conversationId, input.conversationId))
-        .orderBy(desc(messages.createdAt))
-        .limit(10);
-
-      // Reverse to get chronological order and exclude the just-added user message
-      const historyForLLM = conversationHistory
-        .reverse()
-        .slice(0, -1)
-        .map((msg) => ({
-          role: msg.role as 'user' | 'assistant',
-          content: msg.content,
-        }));
-
-      // Get user's files for context
-      const userFiles = await ctx.db.query.files.findMany({
-        where: (files, { eq }) => eq(files.userId, ctx.user.userId),
-      });
-
-      // Prepare document context
-      const documentContext = userFiles
-        .filter((file) => file.extractedContent)
-        .map((file) => ({
-          filename: file.originalFilename,
-          content: file.extractedContent || '',
-        }));
-
-      // Generate AI response using Claude
-      const aiResponseContent = await generateChatResponse(
+      // Use RAG to generate AI response with citations
+      const ragResult = await askQuestion(
+        ctx.user.userId,
         input.content,
-        historyForLLM,
-        documentContext
+        5, // top-k chunks
+        0.5 // similarity threshold
       );
 
-      // Generate citations (placeholder implementation)
-      const citations = await generateCitations(aiResponseContent, documentContext);
-
-      // Save AI response
+      // Save AI response with citations
       const [assistantMessage] = await ctx.db
         .insert(messages)
         .values({
           conversationId: input.conversationId,
           role: 'assistant',
-          content: aiResponseContent,
-          metadata: JSON.stringify({ citations }),
+          content: ragResult.answer,
+          metadata: JSON.stringify({
+            citations: ragResult.citations,
+            chunksUsed: ragResult.chunks.length
+          }),
         })
         .returning();
 

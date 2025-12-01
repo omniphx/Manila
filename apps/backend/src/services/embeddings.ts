@@ -220,6 +220,33 @@ export async function generateEmbeddings(
 }
 
 /**
+ * Generate an embedding vector for a query string
+ * Used for similarity search without storing the embedding
+ *
+ * @param query - The text to embed
+ * @returns The embedding vector (1536 dimensions)
+ */
+export async function generateQueryEmbedding(query: string): Promise<number[]> {
+  try {
+    const openai = createOpenAI({
+      apiKey: env.OPENAI_API_KEY,
+    });
+
+    const embeddingModel = openai.embedding(EMBEDDING_MODEL);
+
+    const { embeddings: embeddingVectors } = await embedMany({
+      model: embeddingModel,
+      values: [query],
+    });
+
+    return embeddingVectors[0];
+  } catch (error) {
+    console.error('Error generating query embedding:', error);
+    throw new Error('Failed to generate query embedding');
+  }
+}
+
+/**
  * Delete all embeddings for a specific file
  * Used when a file is deleted or needs to be re-embedded
  */
