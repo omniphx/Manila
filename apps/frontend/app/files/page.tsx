@@ -317,11 +317,6 @@ export default function FilesPage() {
     setDragOverFolderId(folderId === null ? "root" : folderId);
   };
 
-  // Handle folder drag leave
-  const handleFolderDragLeave = () => {
-    setDragOverFolderId(null);
-  };
-
   // Handle drop on folder
   const handleFolderDrop = (e: React.DragEvent, folderId: string | null) => {
     e.preventDefault();
@@ -397,7 +392,6 @@ export default function FilesPage() {
             }}
             onDragOver={handleFolderDragOver}
             onDragEnter={() => handleFolderDragEnter(folder.id)}
-            onDragLeave={handleFolderDragLeave}
             onDrop={(e) => handleFolderDrop(e, folder.id)}
             className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors ${
               isSelected
@@ -461,7 +455,6 @@ export default function FilesPage() {
             onClick={() => setSelectedFolder(null)}
             onDragOver={handleFolderDragOver}
             onDragEnter={() => handleFolderDragEnter(null)}
-            onDragLeave={handleFolderDragLeave}
             onDrop={(e) => handleFolderDrop(e, null)}
             className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors mb-1 ${
               selectedFolder === null
