@@ -2,8 +2,6 @@
 # Complete stack with PostgreSQL and backend for production deployment
 # Usage: pnpm docker:prod
 
-version: "3.8"
-
 services:
   postgres:
     image: ankane/pgvector:latest

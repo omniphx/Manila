@@ -12,8 +12,8 @@ Steps:
 2. cd /opt/manila
 3. git pull origin main
 4. Navigate to backend folder: apps/backend
-5. pnpm docker:down
-6. pnpm docker:prod
+5. pnpm docker:prod:down
+6. pnpm docker:prod (this can take several minutes)
 7. docker compose ps (verify all containers are running)
 8. docker compose logs -f (check for errors)
 9. pnpm db:migrate
