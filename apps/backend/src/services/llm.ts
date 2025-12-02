@@ -1,9 +1,8 @@
-import { generateText } from 'ai';
-import { openai } from '@ai-sdk/openai';
-import { env } from '../lib/env.js';
+import { generateText } from "ai";
+import { openai } from "@ai-sdk/openai";
 
 export interface ChatMessage {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
 }
 
@@ -21,43 +20,47 @@ export async function generateChatResponse(
   documents: DocumentContext[] = []
 ): Promise<string> {
   // Build system message with document context
-  let systemMessage = 'You are Manila, an AI assistant that helps users understand and analyze their uploaded documents.';
+  let systemMessage =
+    "You are Manila, an AI assistant that helps users understand and analyze their uploaded documents.";
 
   if (documents.length > 0) {
-    systemMessage += '\n\nYou have access to the following documents:\n';
+    systemMessage += "\n\nYou have access to the following documents:\n";
     documents.forEach((doc, idx) => {
       systemMessage += `\n### Document ${idx + 1}: ${doc.filename}\n`;
-      systemMessage += `${doc.content.slice(0, 4000)}${doc.content.length > 4000 ? '...' : ''}\n`;
+      systemMessage += `${doc.content.slice(0, 4000)}${
+        doc.content.length > 4000 ? "..." : ""
+      }\n`;
     });
-    systemMessage += '\n\nWhen answering questions, reference specific information from these documents when relevant. If the answer cannot be found in the provided documents, let the user know.';
+    systemMessage +=
+      "\n\nWhen answering questions, reference specific information from these documents when relevant. If the answer cannot be found in the provided documents, let the user know.";
   } else {
-    systemMessage += ' Currently, no documents have been uploaded. You can help users understand how to use the system or have general conversations.';
+    systemMessage +=
+      " Currently, no documents have been uploaded. You can help users understand how to use the system or have general conversations.";
   }
 
   // Convert conversation history to AI SDK format
   const messages = [
     ...conversationHistory.map((msg) => ({
-      role: msg.role as 'user' | 'assistant',
+      role: msg.role as "user" | "assistant",
       content: msg.content,
     })),
     {
-      role: 'user' as const,
+      role: "user" as const,
       content: userMessage,
     },
   ];
 
   try {
     const result = await generateText({
-      model: openai('gpt-4o'),
+      model: openai("gpt-4o"),
       system: systemMessage,
       messages,
-      maxTokens: 2048,
     });
 
     return result.text;
   } catch (error) {
-    console.error('Error generating chat response:', error);
-    throw new Error('Failed to generate chat response');
+    console.error("Error generating chat response:", error);
+    throw new Error("Failed to generate chat response");
   }
 }
 

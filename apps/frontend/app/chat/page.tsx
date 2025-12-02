@@ -164,9 +164,9 @@ export default function ChatPage() {
         );
       }
     }
-    // Intentionally excluding createConversation from deps to avoid infinite loop
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, conversations, loadingConversations]);
+  }, [conversationId, loadingConversations]);
+  // Only depend on conversationId and loadingConversations
+  // conversations.length is accessed but not a dependency to avoid infinite loop
 
   // Scroll to bottom when messages change
   useEffect(() => {

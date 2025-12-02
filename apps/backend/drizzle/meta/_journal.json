@@ -64,6 +64,27 @@
       "when": 1764543123810,
       "tag": "0008_nebulous_preak",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1764553295371,
+      "tag": "0009_chilly_rumiko_fujikawa",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1764639728247,
+      "tag": "0010_giant_galactus",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1764639900000,
+      "tag": "0011_add_search_vector_trigger",
+      "breakpoints": true
     }
   ]
 }

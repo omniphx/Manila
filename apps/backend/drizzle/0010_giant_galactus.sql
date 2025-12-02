@@ -1,0 +1,1 @@
+ALTER TABLE "files" ALTER COLUMN "search_vector" SET DATA TYPE tsvector USING COALESCE(search_vector::tsvector, to_tsvector('english', ''));

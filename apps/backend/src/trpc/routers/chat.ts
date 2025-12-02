@@ -3,7 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure } from '../trpc.js';
 import { conversations, messages } from '../../db/schema.js';
 import { eq, desc } from 'drizzle-orm';
-import { askQuestion } from '../../services/rag.js';
+import { generateChatWithTools } from '../../services/chat-with-tools.js';
 
 export const chatRouter = router({
   // Create a new conversation
@@ -88,12 +88,28 @@ export const chatRouter = router({
         })
         .returning();
 
-      // Use RAG to generate AI response with citations
-      const ragResult = await askQuestion(
+      // Get conversation history (last 10 messages for context)
+      const conversationHistory = await ctx.db
+        .select()
+        .from(messages)
+        .where(eq(messages.conversationId, input.conversationId))
+        .orderBy(desc(messages.createdAt))
+        .limit(10);
+
+      // Reverse to chronological order and exclude the just-added message
+      const historyForLLM = conversationHistory
+        .reverse()
+        .slice(0, -1)
+        .map((msg) => ({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+        }));
+
+      // Generate AI response using tools for document search/retrieval
+      const chatResult = await generateChatWithTools(
         ctx.user.userId,
         input.content,
-        5, // top-k chunks
-        0.5 // similarity threshold
+        historyForLLM
       );
 
       // Save AI response with citations
@@ -102,10 +118,10 @@ export const chatRouter = router({
         .values({
           conversationId: input.conversationId,
           role: 'assistant',
-          content: ragResult.answer,
+          content: chatResult.answer,
           metadata: JSON.stringify({
-            citations: ragResult.citations,
-            chunksUsed: ragResult.chunks.length
+            citations: chatResult.citations,
+            toolCalls: chatResult.toolCalls,
           }),
         })
         .returning();
