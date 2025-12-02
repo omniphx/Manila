@@ -2,7 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 
-export async function uploadFile(formData: FormData) {
+export async function uploadFile(formData: FormData, folderId?: string | null) {
   try {
     // Get auth token server-side
     const { getToken } = await auth();
@@ -13,6 +13,11 @@ export async function uploadFile(formData: FormData) {
         success: false,
         error: "Not authenticated",
       };
+    }
+
+    // Add folderId to FormData if provided
+    if (folderId) {
+      formData.append("folderId", folderId);
     }
 
     // Forward the file to the backend

@@ -1,75 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
-
-// Mock data
-const mockFolders = [
-  { id: "root", name: "All Files", parentId: null },
-  { id: "f1", name: "Financial Reports", parentId: "root" },
-  { id: "f2", name: "Marketing", parentId: "root" },
-  { id: "f3", name: "Product", parentId: "root" },
-  { id: "f4", name: "Q3 2024", parentId: "f1" },
-  { id: "f5", name: "Q4 2024", parentId: "f1" },
-];
-
-const mockFiles = [
-  {
-    id: "file1",
-    name: "Q3-Financial-Report.pdf",
-    type: "pdf",
-    size: 2457600,
-    folderId: "f4",
-    processingStatus: "completed" as const,
-    createdAt: "2024-10-15T10:30:00Z",
-  },
-  {
-    id: "file2",
-    name: "Q3-Revenue-Analysis.xlsx",
-    type: "xlsx",
-    size: 156000,
-    folderId: "f4",
-    processingStatus: "completed" as const,
-    createdAt: "2024-10-14T14:22:00Z",
-  },
-  {
-    id: "file3",
-    name: "Market-Analysis-2024.pdf",
-    type: "pdf",
-    size: 3840000,
-    folderId: "f2",
-    processingStatus: "processing" as const,
-    createdAt: "2024-10-18T09:15:00Z",
-  },
-  {
-    id: "file4",
-    name: "Product-Roadmap.docx",
-    type: "docx",
-    size: 89000,
-    folderId: "f3",
-    processingStatus: "completed" as const,
-    createdAt: "2024-10-12T16:45:00Z",
-  },
-  {
-    id: "file5",
-    name: "Customer-Feedback-Summary.txt",
-    type: "txt",
-    size: 24000,
-    folderId: "f3",
-    processingStatus: "pending" as const,
-    createdAt: "2024-10-19T11:00:00Z",
-  },
-  {
-    id: "file6",
-    name: "Brand-Guidelines.pdf",
-    type: "pdf",
-    size: 5120000,
-    folderId: "f2",
-    processingStatus: "failed" as const,
-    createdAt: "2024-10-17T08:30:00Z",
-  },
-];
+import { toast } from "sonner";
+import { DragDropOverlay } from "../components/DragDropOverlay";
+import { uploadFile } from "../actions/upload";
+import { trpc } from "@/lib/trpc";
 
 // Icons
 function FileIcon({ className }: { className?: string }) {
@@ -241,30 +178,179 @@ function getFileTypeIcon(type: string) {
 
 export default function FilesPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [selectedFolder, setSelectedFolder] = useState("root");
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(["root"]));
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [showNewFolderModal, setShowNewFolderModal] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [draggedFileId, setDraggedFileId] = useState<string | null>(null);
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useUser();
+  const utils = trpc.useUtils();
+
+  // Fetch files from backend using tRPC
+  const { data: filesData, isLoading, error } = trpc.files.list.useQuery({
+    limit: 100,
+    offset: 0,
+  }, {
+    retry: false, // Don't retry on auth errors
+    refetchInterval: (data) => {
+      // Poll every 2 seconds if any files are processing
+      if (!data || !Array.isArray(data)) return false;
+
+      const hasProcessingFiles = data.some(
+        (file) => file.processingStatus === 'processing' || file.processingStatus === 'pending'
+      );
+      return hasProcessingFiles ? 2000 : false;
+    },
+  });
+
+  // Fetch folders from backend
+  const { data: foldersData } = trpc.folders.list.useQuery({
+    parentId: undefined, // Get all folders
+  });
+
+  // Create folder mutation
+  const createFolderMutation = trpc.folders.create.useMutation({
+    onSuccess: () => {
+      utils.folders.list.invalidate();
+      setShowNewFolderModal(false);
+      setNewFolderName("");
+    },
+  });
+
+  // Move file mutation
+  const moveFileMutation = trpc.files.move.useMutation({
+    onSuccess: () => {
+      utils.files.list.invalidate();
+    },
+  });
 
   const userName = user?.fullName || user?.firstName || "User";
   const userEmail = user?.primaryEmailAddress?.emailAddress || "";
   const userInitials = getInitials(user?.firstName, user?.lastName);
   const userImageUrl = user?.imageUrl;
 
-  // Build folder tree
-  const getFolderChildren = (parentId: string | null) =>
-    mockFolders.filter((f) => f.parentId === parentId);
+  const handleFilesDropped = async (files: File[]) => {
+    if (files.length === 0) return;
 
-  const getFilesInFolder = (folderId: string) => {
-    // For "All Files" (root), show files that would be at root level
-    if (folderId === "root") {
-      return mockFiles.filter((f) => !f.folderId || f.folderId === "root");
+    setIsUploading(true);
+    try {
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append("file", file);
+        const result = await uploadFile(formData, selectedFolder);
+        if (!result.success) {
+          // Check if it's a duplicate file error (409)
+          if (result.error && result.error.includes("already exists")) {
+            toast.error("Duplicate file", {
+              description: result.error,
+            });
+          } else {
+            toast.error("Upload failed", {
+              description: result.error || "An unknown error occurred",
+            });
+          }
+          console.error("Upload error:", result.error);
+        } else {
+          toast.success("File uploaded", {
+            description: `${file.name} has been uploaded successfully`,
+          });
+        }
+      }
+      // Refetch files after upload
+      await utils.files.list.invalidate();
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error("Upload failed", {
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+      });
+    } finally {
+      setIsUploading(false);
     }
-    return mockFiles.filter((f) => f.folderId === folderId);
   };
 
-  // For demo, show all files when viewing root
-  const displayFiles = selectedFolder === "root" ? mockFiles : getFilesInFolder(selectedFolder);
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      await handleFilesDropped(Array.from(files));
+      // Reset input
+      e.target.value = "";
+    }
+  };
+
+  // Handle new folder creation
+  const handleCreateFolder = () => {
+    if (!newFolderName.trim()) return;
+    createFolderMutation.mutate({
+      name: newFolderName.trim(),
+      parentId: selectedFolder || undefined,
+    });
+  };
+
+  // Handle file drag start
+  const handleFileDragStart = (e: React.DragEvent, fileId: string) => {
+    setDraggedFileId(fileId);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  // Handle file drag end
+  const handleFileDragEnd = () => {
+    setDraggedFileId(null);
+    setDragOverFolderId(null);
+  };
+
+  // Handle folder drag over
+  const handleFolderDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  // Handle folder drag enter
+  const handleFolderDragEnter = (folderId: string | null) => {
+    setDragOverFolderId(folderId === null ? "root" : folderId);
+  };
+
+  // Handle drop on folder
+  const handleFolderDrop = (e: React.DragEvent, folderId: string | null) => {
+    e.preventDefault();
+    if (!draggedFileId) return;
+
+    moveFileMutation.mutate({
+      fileId: draggedFileId,
+      folderId,
+    });
+
+    setDraggedFileId(null);
+    setDragOverFolderId(null);
+  };
+
+  // Build folder tree from backend data
+  const folders = foldersData || [];
+  const getFolderChildren = (parentId: string | null) =>
+    folders.filter((f) => f.parentId === parentId);
+
+  // Convert backend files to display format and filter by selected folder
+  const allDisplayFiles = (filesData || []).map((file) => ({
+    id: file.id,
+    name: file.originalFilename,
+    type: file.mimeType.split("/")[1] || "unknown",
+    size: parseInt(file.size),
+    folderId: file.folderId,
+    processingStatus: file.processingStatus as "pending" | "processing" | "completed" | "failed",
+    createdAt: new Date(file.createdAt).toISOString(),
+  }));
+
+  // Filter files based on selected folder
+  const displayFiles = selectedFolder
+    ? allDisplayFiles.filter((f) => f.folderId === selectedFolder)
+    : allDisplayFiles.filter((f) => !f.folderId); // Show files without folder when no folder selected
 
   const toggleFolder = (folderId: string) => {
     const newExpanded = new Set(expandedFolders);
@@ -277,12 +363,16 @@ export default function FilesPage() {
   };
 
   const getBreadcrumbs = () => {
-    const crumbs: { id: string; name: string }[] = [];
-    let current = mockFolders.find((f) => f.id === selectedFolder);
-    while (current) {
-      crumbs.unshift(current);
-      current = mockFolders.find((f) => f.id === current!.parentId);
+    if (!selectedFolder) {
+      return [{ id: null, name: "All Files" }];
     }
+    const crumbs: { id: string | null; name: string }[] = [];
+    let current = folders.find((f) => f.id === selectedFolder);
+    while (current) {
+      crumbs.unshift({ id: current.id, name: current.name });
+      current = folders.find((f) => f.id === current!.parentId);
+    }
+    crumbs.unshift({ id: null, name: "All Files" });
     return crumbs;
   };
 
@@ -300,11 +390,14 @@ export default function FilesPage() {
               setSelectedFolder(folder.id);
               if (hasChildren) toggleFolder(folder.id);
             }}
+            onDragOver={handleFolderDragOver}
+            onDragEnter={() => handleFolderDragEnter(folder.id)}
+            onDrop={(e) => handleFolderDrop(e, folder.id)}
             className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors ${
               isSelected
                 ? "bg-[#6c47ff]/10 text-[#6c47ff]"
                 : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            }`}
+            } ${dragOverFolderId === folder.id ? "bg-[#6c47ff]/20 ring-2 ring-[#6c47ff]" : ""}`}
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
           >
             {hasChildren ? (
@@ -330,7 +423,7 @@ export default function FilesPage() {
   };
 
   return (
-    <div className="flex h-screen bg-white dark:bg-zinc-950 overflow-hidden">
+    <DragDropOverlay onFilesDropped={handleFilesDropped} className="flex h-screen bg-white dark:bg-zinc-950 overflow-hidden">
       {/* Folder Tree Sidebar */}
       <div className="w-56 flex-shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 flex flex-col">
         {/* Sidebar Header */}
@@ -346,7 +439,10 @@ export default function FilesPage() {
 
         {/* New Folder Button */}
         <div className="p-2 border-b border-zinc-200 dark:border-zinc-800">
-          <button className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-[#6c47ff] hover:text-[#6c47ff] transition-colors text-sm">
+          <button
+            onClick={() => setShowNewFolderModal(true)}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-[#6c47ff] hover:text-[#6c47ff] transition-colors text-sm"
+          >
             <PlusIcon className="w-4 h-4" />
             New Folder
           </button>
@@ -354,12 +450,35 @@ export default function FilesPage() {
 
         {/* Folder Tree */}
         <div className="flex-1 overflow-y-auto p-2">
+          {/* All Files */}
+          <button
+            onClick={() => setSelectedFolder(null)}
+            onDragOver={handleFolderDragOver}
+            onDragEnter={() => handleFolderDragEnter(null)}
+            onDrop={(e) => handleFolderDrop(e, null)}
+            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors mb-1 ${
+              selectedFolder === null
+                ? "bg-[#6c47ff]/10 text-[#6c47ff]"
+                : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            } ${dragOverFolderId === "root" ? "bg-[#6c47ff]/20 ring-2 ring-[#6c47ff]" : ""}`}
+          >
+            <span className="w-4" />
+            {selectedFolder === null ? (
+              <FolderOpenIcon className="w-4 h-4 flex-shrink-0 text-[#6c47ff]" />
+            ) : (
+              <FolderIcon className="w-4 h-4 flex-shrink-0 text-zinc-400" />
+            )}
+            <span className="text-sm truncate">All Files</span>
+          </button>
           {renderFolderTree(null)}
         </div>
 
         {/* User Profile Badge */}
         <div className="border-t border-zinc-200 dark:border-zinc-800 p-2">
-          <button className="w-full flex items-center gap-3 p-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">
+          <Link
+            href="/account"
+            className="w-full flex items-center gap-3 p-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
+          >
             {/* Avatar */}
             {userImageUrl ? (
               <img
@@ -381,7 +500,7 @@ export default function FilesPage() {
               </p>
             </div>
             <SettingsIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" />
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -393,7 +512,7 @@ export default function FilesPage() {
             {/* Breadcrumbs */}
             <nav className="flex items-center gap-1 text-sm">
               {getBreadcrumbs().map((crumb, index, arr) => (
-                <span key={crumb.id} className="flex items-center gap-1">
+                <span key={crumb.id || "root"} className="flex items-center gap-1">
                   <button
                     onClick={() => setSelectedFolder(crumb.id)}
                     className={`hover:text-[#6c47ff] transition-colors ${
@@ -438,22 +557,57 @@ export default function FilesPage() {
             </div>
 
             {/* Upload Button */}
-            <button className="flex items-center gap-2 px-4 py-2 bg-[#6c47ff] text-white rounded-full text-sm font-medium hover:bg-[#5a3ad6] transition-colors">
+            <button
+              onClick={handleUploadClick}
+              disabled={isUploading}
+              className="flex items-center gap-2 px-4 py-2 bg-[#6c47ff] text-white rounded-full text-sm font-medium hover:bg-[#5a3ad6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <UploadIcon className="w-4 h-4" />
-              Upload
+              {isUploading ? "Uploading..." : "Upload"}
             </button>
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={handleFileInputChange}
+              className="hidden"
+              accept=".pdf,.doc,.docx,.txt,.xlsx,.xls"
+            />
           </div>
         </div>
 
         {/* File Grid/List */}
         <div className="flex-1 overflow-y-auto p-6">
-          {displayFiles.length === 0 ? (
+          {error ? (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center mb-4">
+                <span className="text-2xl">⚠️</span>
+              </div>
+              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">
+                {error.message || "Failed to load files"}
+              </p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Please sign in to view your files
+              </p>
+            </div>
+          ) : isLoading ? (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <div className="w-12 h-12 rounded-full border-4 border-zinc-200 border-t-[#6c47ff] animate-spin mb-4" />
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                Loading files...
+              </p>
+            </div>
+          ) : displayFiles.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-center">
               <FolderIcon className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mb-4" />
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                No files in this folder
+                No files uploaded yet
               </p>
-              <button className="mt-4 text-sm text-[#6c47ff] hover:text-[#5a3ad6] font-medium">
+              <button
+                onClick={handleUploadClick}
+                className="mt-4 text-sm text-[#6c47ff] hover:text-[#5a3ad6] font-medium"
+              >
                 Upload your first file
               </button>
             </div>
@@ -462,12 +616,15 @@ export default function FilesPage() {
               {displayFiles.map((file) => (
                 <div
                   key={file.id}
+                  draggable
+                  onDragStart={(e) => handleFileDragStart(e, file.id)}
+                  onDragEnd={handleFileDragEnd}
                   onClick={() => setSelectedFile(file.id === selectedFile ? null : file.id)}
-                  className={`group relative p-4 rounded-lg border transition-all cursor-pointer ${
+                  className={`group relative p-4 rounded-lg border transition-all cursor-move ${
                     selectedFile === file.id
                       ? "border-[#6c47ff] bg-[#6c47ff]/5"
                       : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-900"
-                  }`}
+                  } ${draggedFileId === file.id ? "opacity-50" : ""}`}
                 >
                   {/* File Icon */}
                   <div className="flex justify-center mb-3">
@@ -516,12 +673,15 @@ export default function FilesPage() {
               {displayFiles.map((file) => (
                 <div
                   key={file.id}
+                  draggable
+                  onDragStart={(e) => handleFileDragStart(e, file.id)}
+                  onDragEnd={handleFileDragEnd}
                   onClick={() => setSelectedFile(file.id === selectedFile ? null : file.id)}
-                  className={`group grid grid-cols-12 gap-4 px-4 py-3 rounded-lg items-center transition-colors cursor-pointer ${
+                  className={`group grid grid-cols-12 gap-4 px-4 py-3 rounded-lg items-center transition-colors cursor-move ${
                     selectedFile === file.id
                       ? "bg-[#6c47ff]/5 border border-[#6c47ff]"
                       : "hover:bg-zinc-50 dark:hover:bg-zinc-900"
-                  }`}
+                  } ${draggedFileId === file.id ? "opacity-50" : ""}`}
                 >
                   <div className="col-span-5 flex items-center gap-3 min-w-0">
                     <FileIcon className={`w-5 h-5 flex-shrink-0 ${getFileTypeIcon(file.type)}`} />
@@ -560,6 +720,47 @@ export default function FilesPage() {
           </span>
         </div>
       </div>
-    </div>
+
+      {/* New Folder Modal */}
+      {showNewFolderModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowNewFolderModal(false)}>
+          <div
+            className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl p-6 w-full max-w-md mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+              Create New Folder
+            </h2>
+            <input
+              type="text"
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleCreateFolder();
+                if (e.key === "Escape") setShowNewFolderModal(false);
+              }}
+              placeholder="Folder name"
+              autoFocus
+              className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#6c47ff] focus:border-transparent"
+            />
+            <div className="flex items-center justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowNewFolderModal(false)}
+                className="px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateFolder}
+                disabled={!newFolderName.trim() || createFolderMutation.isPending}
+                className="px-4 py-2 bg-[#6c47ff] text-white rounded-md text-sm font-medium hover:bg-[#5a3ad6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {createFolderMutation.isPending ? "Creating..." : "Create"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </DragDropOverlay>
   );
 }

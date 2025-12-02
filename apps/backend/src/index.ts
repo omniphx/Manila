@@ -8,7 +8,7 @@ import {
   FastifyTRPCPluginOptions,
 } from "@trpc/server/adapters/fastify";
 import Fastify from "fastify";
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "crypto";
 import { promises as fs } from "fs";
 import { join } from "path";
 import { env } from "./lib/env.js";
@@ -236,6 +236,11 @@ async function main() {
           });
         }
 
+        // Get folderId from form fields if provided
+        server.log.info({ fields: data.fields }, 'Upload fields received');
+        const folderId = data.fields.folderId ? String((data.fields.folderId as any).value) : null;
+        server.log.info({ folderId }, 'Parsed folderId');
+
         // Validate file type
         if (!isAllowedMimeType(data.mimetype)) {
           return reply.code(400).send({
@@ -248,6 +253,27 @@ async function main() {
 
         // Read file buffer
         const buffer = await data.toBuffer();
+
+        // Generate content hash for deduplication
+        const contentHash = createHash('sha256').update(buffer).digest('hex');
+
+        // Check if file with same content already exists for this user
+        const [existingFile] = await db
+          .select()
+          .from(files)
+          .where(sql`${files.userId} = ${auth.userId} AND ${files.contentHash} = ${contentHash}`)
+          .limit(1);
+
+        if (existingFile) {
+          server.log.info({ contentHash, existingFileId: existingFile.id }, 'Duplicate file detected');
+          return reply.code(409).send({
+            error: {
+              message: `This file already exists: ${existingFile.originalFilename}`,
+              statusCode: 409,
+              existingFileId: existingFile.id,
+            },
+          });
+        }
 
         // Generate unique filename
         const fileExtension = data.filename.split('.').pop() || '';
@@ -262,11 +288,13 @@ async function main() {
           .insert(files)
           .values({
             userId: auth.userId,
+            folderId: folderId || null,
             filename: uniqueFilename,
             originalFilename: data.filename,
             mimeType: data.mimetype,
             size: buffer.length.toString(),
             path: filePath,
+            contentHash,
             processingStatus: 'pending',
           })
           .returning();

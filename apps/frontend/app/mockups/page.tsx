@@ -3,6 +3,11 @@ import Link from "next/link";
 export default function MockupsPage() {
   const mockups = [
     {
+      href: "/mockups/landing",
+      title: "Landing Page",
+      description: "Unauthenticated homepage with sign in/up and feature overview",
+    },
+    {
       href: "/mockups/chat-main",
       title: "Chat Interface",
       description: "Main chat view with collapsible sidebar and document citations",
@@ -11,6 +16,11 @@ export default function MockupsPage() {
       href: "/mockups/file-browser",
       title: "File Browser",
       description: "Folder tree navigation with grid/list toggle and file actions",
+    },
+    {
+      href: "/mockups/account",
+      title: "Account Settings",
+      description: "User profile, notifications, appearance, and account management",
     },
     {
       href: "/mockups/chat-with-upload",

@@ -1,41 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
-
-// Mock data for demonstration
-const mockMessages = [
-  {
-    id: "1",
-    role: "user" as const,
-    content: "What are the key findings from the Q3 financial report?",
-  },
-  {
-    id: "2",
-    role: "assistant" as const,
-    content: "Based on the Q3 Financial Report, here are the key findings:\n\n1. **Revenue Growth**: Total revenue increased by 23% year-over-year, reaching $4.2M.\n\n2. **Operating Costs**: Operating expenses were reduced by 8% through process automation initiatives.\n\n3. **Customer Acquisition**: The company added 1,247 new enterprise customers, a 45% increase from Q2.",
-    citations: [
-      { id: "c1", filename: "Q3-Financial-Report.pdf", page: 3 },
-      { id: "c2", filename: "Q3-Financial-Report.pdf", page: 7 },
-    ],
-  },
-  {
-    id: "3",
-    role: "user" as const,
-    content: "How does this compare to our competitors mentioned in the market analysis?",
-  },
-  {
-    id: "4",
-    role: "assistant" as const,
-    content: "According to the Market Analysis document, your performance compares favorably:\n\n- **Revenue Growth**: Your 23% growth outpaces the industry average of 15% and competitor average of 18%.\n\n- **Cost Efficiency**: Your 8% cost reduction is notable as competitors averaged only 3% reductions.\n\n- **Market Share**: You've gained approximately 2.3% market share in Q3, moving from 12.1% to 14.4%.",
-    citations: [
-      { id: "c3", filename: "Market-Analysis-2024.pdf", page: 12 },
-      { id: "c4", filename: "Market-Analysis-2024.pdf", page: 15 },
-      { id: "c5", filename: "Q3-Financial-Report.pdf", page: 8 },
-    ],
-  },
-];
+import { DragDropOverlay } from "../components/DragDropOverlay";
+import { UploadProgress, type UploadFile } from "../components/UploadProgress";
+import { ProcessingStatus, type ProcessingFile } from "../components/ProcessingStatus";
+import { uploadFile } from "../actions/upload";
+import { trpc } from "@/lib/trpc";
 
 const mockRecentFiles = [
   { id: "f1", name: "Q3-Financial-Report.pdf", type: "pdf" },
@@ -110,6 +82,14 @@ function SettingsIcon({ className }: { className?: string }) {
   );
 }
 
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+    </svg>
+  );
+}
+
 // Helper to get user initials from name
 function getInitials(firstName?: string | null, lastName?: string | null): string {
   const first = firstName?.[0] ?? "";
@@ -117,9 +97,47 @@ function getInitials(firstName?: string | null, lastName?: string | null): strin
   return (first + last).toUpperCase() || "?";
 }
 
+// Helper to format time
+function formatTime(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return d.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+// Typing indicator component
+function TypingIndicator() {
+  return (
+    <div className="flex gap-4">
+      <div className="w-8 h-8 rounded-full bg-[#6c47ff] flex items-center justify-center text-sm font-medium text-white flex-shrink-0">
+        M
+      </div>
+      <div className="flex-1">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Manila</span>
+          <span className="text-xs text-zinc-400 dark:text-zinc-500">thinking...</span>
+        </div>
+        <div className="flex gap-1">
+          <span className="w-2 h-2 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '0ms' }}></span>
+          <span className="w-2 h-2 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '150ms' }}></span>
+          <span className="w-2 h-2 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '300ms' }}></span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [inputValue, setInputValue] = useState("");
+  const [uploadingFiles, setUploadingFiles] = useState<UploadFile[]>([]);
+  const [processingFiles, setProcessingFiles] = useState<ProcessingFile[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useUser();
 
   const userName = user?.fullName || user?.firstName || "User";
@@ -127,8 +145,241 @@ export default function ChatPage() {
   const userInitials = getInitials(user?.firstName, user?.lastName);
   const userImageUrl = user?.imageUrl;
 
+  // Create or get existing conversation
+  const { data: conversations = [], isLoading: loadingConversations, refetch: refetchConversations } = trpc.chat.getConversations.useQuery();
+  const createConversation = trpc.chat.createConversation.useMutation();
+  const deleteConversation = trpc.chat.deleteConversation.useMutation();
+  const { data: messages = [], refetch: refetchMessages } = trpc.chat.getMessages.useQuery(
+    { conversationId: conversationId! },
+    { enabled: !!conversationId }
+  );
+  const sendMessage = trpc.chat.sendMessage.useMutation();
+
+  // Initialize conversation on mount - load most recent or create new
+  useEffect(() => {
+    if (!conversationId && !loadingConversations) {
+      if (conversations.length > 0) {
+        // Load the most recent conversation
+        setConversationId(conversations[0].id);
+      } else if (!createConversation.isPending) {
+        // Create new conversation if none exist and not already creating
+        createConversation.mutate(
+          { title: "New Conversation" },
+          {
+            onSuccess: (data) => {
+              setConversationId(data.id);
+            },
+          }
+        );
+      }
+    }
+  }, [conversationId, loadingConversations]);
+  // Only depend on conversationId and loadingConversations
+  // conversations.length is accessed but not a dependency to avoid infinite loop
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isTyping]);
+
+  const handleSendMessage = async () => {
+    if (!inputValue.trim() || !conversationId) return;
+
+    const content = inputValue.trim();
+    setInputValue("");
+    setIsTyping(true);
+    setError(null);
+
+    try {
+      await sendMessage.mutateAsync({
+        conversationId,
+        content,
+      });
+
+      // Refetch messages to get the new user message and AI response
+      await refetchMessages();
+
+      // Refetch conversations to update the title (in case it was auto-generated)
+      await refetchConversations();
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send message. Please try again.';
+      setError(errorMessage);
+      // Restore the message in case of error
+      setInputValue(content);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const handleDeleteConversation = async (conversationIdToDelete: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering conversation selection
+
+    try {
+      await deleteConversation.mutateAsync({ conversationId: conversationIdToDelete });
+
+      // Refetch conversations list
+      await refetchConversations();
+
+      // If we deleted the current conversation, switch to another one
+      if (conversationIdToDelete === conversationId) {
+        const remainingConversations = conversations.filter(c => c.id !== conversationIdToDelete);
+
+        if (remainingConversations.length > 0) {
+          // Switch to the most recent remaining conversation
+          setConversationId(remainingConversations[0].id);
+        } else {
+          // No conversations left, create a new one
+          const newConversation = await createConversation.mutateAsync({ title: "New Conversation" });
+          setConversationId(newConversation.id);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to delete conversation:', err);
+      setError('Failed to delete conversation. Please try again.');
+    }
+  };
+
+  const handleFilesDropped = async (files: File[]) => {
+    if (files.length === 0) return;
+
+    // Create initial upload file entries
+    const newUploadFiles: UploadFile[] = files.map((file, index) => ({
+      id: `upload-${Date.now()}-${index}`,
+      name: file.name,
+      size: file.size,
+      progress: 0,
+      status: "uploading" as const,
+    }));
+
+    setUploadingFiles((prev) => [...prev, ...newUploadFiles]);
+
+    // Upload each file
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const uploadFileEntry = newUploadFiles[i];
+
+      try {
+        // Simulate progress updates (since server action doesn't support progress)
+        const progressInterval = setInterval(() => {
+          setUploadingFiles((prev) =>
+            prev.map((f) =>
+              f.id === uploadFileEntry.id && f.status === "uploading"
+                ? { ...f, progress: Math.min(f.progress + 10, 90) }
+                : f
+            )
+          );
+        }, 200);
+
+        const formData = new FormData();
+        formData.append("file", file);
+        const result = await uploadFile(formData);
+
+        clearInterval(progressInterval);
+
+        if (result.success) {
+          // Mark upload as complete
+          setUploadingFiles((prev) =>
+            prev.map((f) =>
+              f.id === uploadFileEntry.id
+                ? { ...f, progress: 100, status: "completed" }
+                : f
+            )
+          );
+
+          // Add to processing queue
+          const processingId = `process-${Date.now()}-${i}`;
+          setProcessingFiles((prev) => [
+            ...prev,
+            {
+              id: processingId,
+              name: file.name,
+              status: "processing",
+              progress: "Analyzing document structure...",
+            },
+          ]);
+
+          // Simulate processing with status updates
+          setTimeout(() => {
+            setProcessingFiles((prev) =>
+              prev.map((f) =>
+                f.id === processingId
+                  ? { ...f, progress: "Extracting text content..." }
+                  : f
+              )
+            );
+          }, 1000);
+
+          setTimeout(() => {
+            setProcessingFiles((prev) =>
+              prev.map((f) =>
+                f.id === processingId
+                  ? { ...f, progress: "Generating embeddings..." }
+                  : f
+              )
+            );
+          }, 2000);
+
+          // Complete processing
+          setTimeout(() => {
+            setProcessingFiles((prev) =>
+              prev.map((f) =>
+                f.id === processingId
+                  ? {
+                      ...f,
+                      status: "completed",
+                      pages: Math.floor(Math.random() * 50) + 1,
+                    }
+                  : f
+              )
+            );
+          }, 3000);
+
+          // Clear completed processing after 5 seconds
+          setTimeout(() => {
+            setProcessingFiles((prev) =>
+              prev.filter((f) => f.id !== processingId || f.status !== "completed")
+            );
+          }, 8000);
+        } else {
+          setUploadingFiles((prev) =>
+            prev.map((f) =>
+              f.id === uploadFileEntry.id
+                ? { ...f, status: "error", error: result.error }
+                : f
+            )
+          );
+        }
+      } catch (error) {
+        setUploadingFiles((prev) =>
+          prev.map((f) =>
+            f.id === uploadFileEntry.id
+              ? { ...f, status: "error", error: "Upload failed" }
+              : f
+          )
+        );
+      }
+    }
+
+    // Clear completed uploads after 3 seconds
+    setTimeout(() => {
+      setUploadingFiles((prev) => prev.filter((f) => f.status !== "completed"));
+    }, 3000);
+  };
+
+  const handleCancelUpload = (fileId: string) => {
+    setUploadingFiles((prev) => prev.filter((f) => f.id !== fileId));
+  };
+
   return (
-    <div className="flex h-screen bg-white dark:bg-zinc-950 overflow-hidden">
+    <DragDropOverlay onFilesDropped={handleFilesDropped} className="flex h-screen bg-white dark:bg-zinc-950 overflow-hidden">
       {/* Sidebar */}
       <div
         className={`${
@@ -154,6 +405,28 @@ export default function ChatPage() {
           </button>
         </div>
 
+        {/* New Chat Button */}
+        <div className="p-2 border-b border-zinc-200 dark:border-zinc-800">
+          <button
+            onClick={() => {
+              createConversation.mutate(
+                { title: "New Conversation" },
+                {
+                  onSuccess: (data) => {
+                    setConversationId(data.id);
+                  },
+                }
+              );
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-md transition-colors bg-[#6c47ff] text-white hover:bg-[#5a3ad6] cursor-pointer"
+          >
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            {sidebarOpen && <span className="text-sm font-medium">New Chat</span>}
+          </button>
+        </div>
+
         {/* View Toggle */}
         <div className="p-2 border-b border-zinc-200 dark:border-zinc-800">
           <div className="flex flex-col gap-1">
@@ -173,39 +446,56 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Recent Files (when sidebar is open) */}
+        {/* Recent Conversations (when sidebar is open) */}
         {sidebarOpen && (
           <div className="flex-1 overflow-y-auto p-3">
             <h3 className="text-xs font-semibold text-zinc-500 dark:text-zinc-500 uppercase tracking-wider mb-2">
-              Recent Files
+              Recent Conversations
             </h3>
             <div className="space-y-1">
-              {mockRecentFiles.map((file) => (
-                <button
-                  key={file.id}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors group"
+              {conversations.map((conv) => (
+                <div
+                  key={conv.id}
+                  className={`w-full flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors group ${
+                    conv.id === conversationId ? 'bg-zinc-200 dark:bg-zinc-800' : ''
+                  }`}
                 >
-                  <FileIcon className="w-4 h-4 text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 flex-shrink-0" />
-                  <span className="text-sm text-zinc-700 dark:text-zinc-300 truncate">
-                    {file.name}
-                  </span>
-                </button>
+                  <button
+                    onClick={() => setConversationId(conv.id)}
+                    className="flex-1 flex items-center gap-2 text-left min-w-0 cursor-pointer"
+                  >
+                    <ChatIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+                    <span className="text-sm text-zinc-700 dark:text-zinc-300 truncate">
+                      {conv.title || 'New Conversation'}
+                    </span>
+                  </button>
+                  <button
+                    onClick={(e) => handleDeleteConversation(conv.id, e)}
+                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-all flex-shrink-0 cursor-pointer"
+                    title="Delete conversation"
+                  >
+                    <TrashIcon className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+                  </button>
+                </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Collapsed state - just show file icons */}
+        {/* Collapsed state - just show chat icons */}
         {!sidebarOpen && (
           <div className="flex-1 overflow-y-auto p-2">
             <div className="space-y-1">
-              {mockRecentFiles.slice(0, 5).map((file) => (
+              {conversations.slice(0, 5).map((conv) => (
                 <button
-                  key={file.id}
-                  className="w-full flex items-center justify-center p-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
-                  title={file.name}
+                  key={conv.id}
+                  onClick={() => setConversationId(conv.id)}
+                  className={`w-full flex items-center justify-center p-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors cursor-pointer ${
+                    conv.id === conversationId ? 'bg-zinc-200 dark:bg-zinc-800' : ''
+                  }`}
+                  title={conv.title || 'New Conversation'}
                 >
-                  <FileIcon className="w-4 h-4 text-zinc-400" />
+                  <ChatIcon className="w-4 h-4 text-zinc-400" />
                 </button>
               ))}
             </div>
@@ -214,7 +504,10 @@ export default function ChatPage() {
 
         {/* User Profile Badge */}
         <div className="border-t border-zinc-200 dark:border-zinc-800 p-2">
-          <button className={`w-full flex items-center gap-3 p-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors ${sidebarOpen ? '' : 'justify-center'}`}>
+          <Link
+            href="/account"
+            className={`w-full flex items-center gap-3 p-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors ${sidebarOpen ? '' : 'justify-center'}`}
+          >
             {/* Avatar */}
             {userImageUrl ? (
               <img
@@ -240,7 +533,7 @@ export default function ChatPage() {
             {sidebarOpen && (
               <SettingsIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" />
             )}
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -266,54 +559,106 @@ export default function ChatPage() {
 
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
-          {mockMessages.map((message) => (
-            <div key={message.id} className="flex gap-4">
-              {/* Avatar */}
-              <div
-                className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-medium ${
-                  message.role === "user"
-                    ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
-                    : "bg-[#6c47ff] text-white"
-                }`}
-              >
-                {message.role === "user" ? "U" : "M"}
-              </div>
+          {messages.map((message) => {
+            const metadata = message.metadata ? JSON.parse(message.metadata) : null;
+            const citations = metadata?.citations || [];
 
-              {/* Message Content */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                    {message.role === "user" ? "You" : "Manila"}
-                  </span>
-                </div>
-                <div className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">
-                  {message.content}
-                </div>
-
-                {/* Citations */}
-                {message.role === "assistant" && message.citations && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {message.citations.map((citation) => (
-                      <button
-                        key={citation.id}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-                      >
-                        <FileIcon className="w-3 h-3" />
-                        <span>{citation.filename}</span>
-                        <span className="text-zinc-400 dark:text-zinc-500">
-                          p.{citation.page}
-                        </span>
-                      </button>
-                    ))}
+            return (
+              <div key={message.id} className="flex gap-4">
+                {/* Avatar */}
+                {message.role === "user" ? (
+                  userImageUrl ? (
+                    <img
+                      src={userImageUrl}
+                      alt={userName}
+                      className="w-8 h-8 rounded-full flex-shrink-0 object-cover"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 flex-shrink-0 flex items-center justify-center text-sm font-medium">
+                      {userInitials}
+                    </div>
+                  )
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-[#6c47ff] text-white flex-shrink-0 flex items-center justify-center text-sm font-medium">
+                    M
                   </div>
                 )}
+
+                {/* Message Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      {message.role === "user" ? "You" : "Manila"}
+                    </span>
+                    <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                      {formatTime(message.createdAt)}
+                    </span>
+                  </div>
+                  <div className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">
+                    {message.content}
+                  </div>
+
+                  {/* Citations */}
+                  {message.role === "assistant" && citations.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {citations.map((citation: any, index: number) => (
+                        <button
+                          key={index}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                        >
+                          <FileIcon className="w-3 h-3" />
+                          <span>{citation.filename}</span>
+                          {citation.page && (
+                            <span className="text-zinc-400 dark:text-zinc-500">
+                              {citation.page}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
+
+          {/* Typing Indicator */}
+          {isTyping && <TypingIndicator />}
+
+          {/* Upload Progress */}
+          {uploadingFiles.length > 0 && (
+            <UploadProgress files={uploadingFiles} onCancel={handleCancelUpload} />
+          )}
+
+          {/* Processing Status */}
+          {processingFiles.length > 0 && (
+            <ProcessingStatus files={processingFiles} />
+          )}
+
+          <div ref={messagesEndRef} />
         </div>
 
         {/* Input Area */}
         <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+          {/* Error Message */}
+          {error && (
+            <div className="mb-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2">
+              <svg className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+              </div>
+              <button
+                onClick={() => setError(null)}
+                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
           <div className="flex items-center gap-3">
             {/* File Upload Button */}
             <button
@@ -328,14 +673,16 @@ export default function ChatPage() {
               <textarea
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder="Ask a question about your documents..."
                 rows={1}
                 className="w-full px-4 py-3 pr-12 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 resize-none focus:outline-none focus:ring-2 focus:ring-[#6c47ff]/50 focus:border-[#6c47ff]"
                 style={{ minHeight: "48px", maxHeight: "120px" }}
               />
               <button
-                className="absolute right-2 bottom-2 p-2 rounded-lg bg-[#6c47ff] text-white hover:bg-[#5a3ad6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!inputValue.trim()}
+                onClick={handleSendMessage}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-[#6c47ff] text-white hover:bg-[#5a3ad6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!inputValue.trim() || !conversationId || isTyping}
               >
                 <SendIcon className="w-4 h-4" />
               </button>
@@ -346,6 +693,6 @@ export default function ChatPage() {
           </p>
         </div>
       </div>
-    </div>
+    </DragDropOverlay>
   );
 }

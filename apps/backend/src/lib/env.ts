@@ -15,6 +15,7 @@ const envSchema = z.object({
   RATE_LIMIT_TIME_WINDOW: z.string().default('15m'),
   CLERK_PUBLISHABLE_KEY: z.string(),
   CLERK_SECRET_KEY: z.string(),
+  OPENAI_API_KEY: z.string(),
 });
 
 const parsed = envSchema.safeParse(process.env);

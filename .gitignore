@@ -39,3 +39,9 @@ pnpm-debug.log*
 *.swp
 *.swo
 *~
+
+# Uploaded files
+apps/backend/uploads/
+
+# Playwright artifacts
+.playwright-mcp/

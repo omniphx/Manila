@@ -151,53 +151,63 @@ The backend is a Fastify server with tRPC for type-safe API endpoints.
 - `src/trpc/context.ts` - Context creation with Clerk auth and database access
 
 **Environment**:
-- Development uses `.env.development`, production uses `.env`
+- Uses `.env` for all environments (development and production)
 - Schema validation via Zod in `src/lib/env.ts`
 - Build output: `dist/`
 - Runtime: Node.js with ES modules (`type: "module"`)
 - Dev tool: `tsx` for hot-reloading
 
+**Local development workflow (recommended):**
+
+For faster iteration, run PostgreSQL in Docker and the backend locally:
+
+```bash
+cd apps/backend
+
+# 1. Start PostgreSQL database
+pnpm db:start
+
+# 2. Run backend locally (in a separate terminal)
+pnpm dev
+
+# When done:
+pnpm db:stop
+```
+
 **Database commands:**
 ```bash
 cd apps/backend
 
-# Generate migrations from schema changes
-pnpm db:generate
+# Start/stop PostgreSQL database
+pnpm db:start          # Start database in Docker (runs in background)
+pnpm db:stop           # Stop database
+pnpm db:logs           # View database logs
+pnpm db:clean          # Remove database and volumes (fresh start)
 
-# Apply migrations to database
-pnpm db:migrate
-
-# Push schema directly to database (development)
-pnpm db:push
-
-# Open Drizzle Studio GUI
-pnpm db:studio
+# Database migrations and schema
+pnpm db:generate       # Generate migrations from schema changes
+pnpm db:migrate        # Apply migrations to database
+pnpm db:push           # Push schema directly to database (development)
+pnpm db:studio         # Open Drizzle Studio GUI
 ```
 
-**Docker commands:**
+**Docker commands (production):**
+
+Use these for production deployment (full stack with backend + database in Docker):
+
 ```bash
 cd apps/backend
 
-# Run development environment with Docker
-pnpm docker:dev
+# Production
+pnpm docker:prod:build      # Build production Docker images
+pnpm docker:prod:up         # Run production environment
+pnpm docker:prod            # Build and run production (combined)
+pnpm docker:prod:logs       # View production logs
+pnpm docker:prod:status     # Check production status
 
-# Build production Docker images
-pnpm docker:prod:build
-
-# Run production environment
-pnpm docker:prod:up
-
-# Build and run production (combined)
-pnpm docker:prod
-
-# Stop all containers
-pnpm docker:down
-
-# View logs
-pnpm docker:logs
-
-# Clean up volumes and containers
-pnpm docker:clean
+# Management
+pnpm docker:prod:down       # Stop production containers
+pnpm docker:prod:clean      # Clean up production volumes and containers
 ```
 
 The backend exposes endpoints:

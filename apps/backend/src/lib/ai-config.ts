@@ -16,10 +16,6 @@ export const AI_CONFIG = {
       model: process.env.LLM_EXTRACTION_VISION_MODEL || 'gpt-4o',
     },
   },
-  embeddings: {
-    provider: (process.env.LLM_EMBEDDINGS_PROVIDER || 'openai') as 'openai' | 'anthropic',
-    model: process.env.LLM_EMBEDDINGS_MODEL || 'text-embedding-3-small',
-  },
   // Add more tasks as needed (summarization, classification, etc.)
 } as const;
 
@@ -38,7 +34,7 @@ const providers = {
 /**
  * Get a model instance for a specific task
  */
-export function getModel(task: 'extraction-text' | 'extraction-vision' | 'embeddings') {
+export function getModel(task: 'extraction-text' | 'extraction-vision') {
   let config;
 
   switch (task) {
@@ -47,9 +43,6 @@ export function getModel(task: 'extraction-text' | 'extraction-vision' | 'embedd
       break;
     case 'extraction-vision':
       config = AI_CONFIG.extraction.vision;
-      break;
-    case 'embeddings':
-      config = AI_CONFIG.embeddings;
       break;
   }
 
