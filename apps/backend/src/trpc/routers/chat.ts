@@ -30,6 +30,32 @@ export const chatRouter = router({
       .orderBy(desc(conversations.updatedAt));
   }),
 
+  // Delete a conversation
+  deleteConversation: protectedProcedure
+    .input(z.object({ conversationId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      // Verify the conversation belongs to the user
+      const [conversation] = await ctx.db
+        .select()
+        .from(conversations)
+        .where(eq(conversations.id, input.conversationId))
+        .limit(1);
+
+      if (!conversation || conversation.userId !== ctx.user.userId) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Conversation not found',
+        });
+      }
+
+      // Delete the conversation (messages will cascade delete)
+      await ctx.db
+        .delete(conversations)
+        .where(eq(conversations.id, input.conversationId));
+
+      return { success: true };
+    }),
+
   // Get messages for a specific conversation
   getMessages: protectedProcedure
     .input(z.object({ conversationId: z.string().uuid() }))

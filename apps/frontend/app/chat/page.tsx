@@ -82,6 +82,14 @@ function SettingsIcon({ className }: { className?: string }) {
   );
 }
 
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+    </svg>
+  );
+}
+
 // Helper to get user initials from name
 function getInitials(firstName?: string | null, lastName?: string | null): string {
   const first = firstName?.[0] ?? "";
@@ -138,8 +146,9 @@ export default function ChatPage() {
   const userImageUrl = user?.imageUrl;
 
   // Create or get existing conversation
-  const { data: conversations = [], isLoading: loadingConversations } = trpc.chat.getConversations.useQuery();
+  const { data: conversations = [], isLoading: loadingConversations, refetch: refetchConversations } = trpc.chat.getConversations.useQuery();
   const createConversation = trpc.chat.createConversation.useMutation();
+  const deleteConversation = trpc.chat.deleteConversation.useMutation();
   const { data: messages = [], refetch: refetchMessages } = trpc.chat.getMessages.useQuery(
     { conversationId: conversationId! },
     { enabled: !!conversationId }
@@ -204,6 +213,34 @@ export default function ChatPage() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
+    }
+  };
+
+  const handleDeleteConversation = async (conversationIdToDelete: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering conversation selection
+
+    try {
+      await deleteConversation.mutateAsync({ conversationId: conversationIdToDelete });
+
+      // Refetch conversations list
+      await refetchConversations();
+
+      // If we deleted the current conversation, switch to another one
+      if (conversationIdToDelete === conversationId) {
+        const remainingConversations = conversations.filter(c => c.id !== conversationIdToDelete);
+
+        if (remainingConversations.length > 0) {
+          // Switch to the most recent remaining conversation
+          setConversationId(remainingConversations[0].id);
+        } else {
+          // No conversations left, create a new one
+          const newConversation = await createConversation.mutateAsync({ title: "New Conversation" });
+          setConversationId(newConversation.id);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to delete conversation:', err);
+      setError('Failed to delete conversation. Please try again.');
     }
   };
 
@@ -378,7 +415,7 @@ export default function ChatPage() {
                 }
               );
             }}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-md transition-colors bg-[#6c47ff] text-white hover:bg-[#5a3ad6]"
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-md transition-colors bg-[#6c47ff] text-white hover:bg-[#5a3ad6] cursor-pointer"
           >
             <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -414,18 +451,29 @@ export default function ChatPage() {
             </h3>
             <div className="space-y-1">
               {conversations.map((conv) => (
-                <button
+                <div
                   key={conv.id}
-                  onClick={() => setConversationId(conv.id)}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors group ${
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors group ${
                     conv.id === conversationId ? 'bg-zinc-200 dark:bg-zinc-800' : ''
                   }`}
                 >
-                  <ChatIcon className="w-4 h-4 text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 flex-shrink-0" />
-                  <span className="text-sm text-zinc-700 dark:text-zinc-300 truncate">
-                    {conv.title || 'New Conversation'}
-                  </span>
-                </button>
+                  <button
+                    onClick={() => setConversationId(conv.id)}
+                    className="flex-1 flex items-center gap-2 text-left min-w-0 cursor-pointer"
+                  >
+                    <ChatIcon className="w-4 h-4 text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 flex-shrink-0" />
+                    <span className="text-sm text-zinc-700 dark:text-zinc-300 truncate">
+                      {conv.title || 'New Conversation'}
+                    </span>
+                  </button>
+                  <button
+                    onClick={(e) => handleDeleteConversation(conv.id, e)}
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-opacity flex-shrink-0 cursor-pointer"
+                    title="Delete conversation"
+                  >
+                    <TrashIcon className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400" />
+                  </button>
+                </div>
               ))}
             </div>
           </div>
@@ -439,7 +487,7 @@ export default function ChatPage() {
                 <button
                   key={conv.id}
                   onClick={() => setConversationId(conv.id)}
-                  className={`w-full flex items-center justify-center p-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors ${
+                  className={`w-full flex items-center justify-center p-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors cursor-pointer ${
                     conv.id === conversationId ? 'bg-zinc-200 dark:bg-zinc-800' : ''
                   }`}
                   title={conv.title || 'New Conversation'}
