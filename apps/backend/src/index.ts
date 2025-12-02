@@ -18,7 +18,6 @@ import { createContext } from "./trpc/context.js";
 import { appRouter, type AppRouter } from "./trpc/router.js";
 import { sql, eq } from "drizzle-orm";
 import { extractFileContent } from "./services/file-extraction.js";
-import { generateEmbeddings } from "./services/embeddings.js";
 
 const UPLOAD_DIR = join(process.cwd(), 'uploads');
 
@@ -82,34 +81,6 @@ async function processFileExtraction(
           processingError: null,
         })
         .where(eq(files.id, fileId));
-
-      // Generate embeddings from extracted content
-      // Get userId from file record
-      const [file] = await db
-        .select({ userId: files.userId })
-        .from(files)
-        .where(eq(files.id, fileId))
-        .limit(1);
-
-      if (file) {
-        const embeddingResult = await generateEmbeddings(
-          fileId,
-          file.userId,
-          result.content
-        );
-
-        if (!embeddingResult.success) {
-          server.log.warn(
-            { fileId, error: embeddingResult.error },
-            'Failed to generate embeddings'
-          );
-        } else {
-          server.log.info(
-            { fileId, embeddingCount: embeddingResult.embeddingIds.length },
-            'Generated embeddings successfully'
-          );
-        }
-      }
     } else {
       // Update with error
       await db

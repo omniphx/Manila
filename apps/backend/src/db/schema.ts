@@ -1,23 +1,10 @@
-import { pgTable, uuid, varchar, timestamp, text, vector, customType } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, text, customType } from 'drizzle-orm/pg-core';
 
 // Custom tsvector type for PostgreSQL full-text search
 const tsvector = customType<{ data: string }>({
   dataType() {
     return 'tsvector';
   },
-});
-
-export const embeddings = pgTable('embeddings', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: text('user_id').notNull(), // Clerk user ID (e.g., user_xxxxx)
-  fileId: uuid('file_id'), // References files.id - null if embedding is not from a file
-  content: text('content').notNull(), // The text chunk that was embedded
-  contentHash: varchar('content_hash', { length: 64 }), // SHA-256 hash for deduplication
-  embedding: vector('embedding', { dimensions: 1536 }).notNull(),
-  embeddingModel: varchar('embedding_model', { length: 100 }).notNull(), // e.g., 'text-embedding-3-small'
-  metadata: text('metadata'), // JSON string: { chunkIndex: number, totalChunks: number, startPos: number, endPos: number }
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
 export const folders = pgTable('folders', {
@@ -69,8 +56,6 @@ export const messages = pgTable('messages', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
-export type Embedding = typeof embeddings.$inferSelect;
-export type NewEmbedding = typeof embeddings.$inferInsert;
 export type Folder = typeof folders.$inferSelect;
 export type NewFolder = typeof folders.$inferInsert;
 export type File = typeof files.$inferSelect;

@@ -85,6 +85,13 @@
       "when": 1764639900000,
       "tag": "0011_add_search_vector_trigger",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1764642000000,
+      "tag": "0012_drop_embeddings",
+      "breakpoints": true
     }
   ]
 }
