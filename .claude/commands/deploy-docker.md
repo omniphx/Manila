@@ -18,4 +18,23 @@ Steps:
 8. docker compose logs -f (check for errors)
 9. pnpm db:migrate
 
+OPTIONAL MAINTENANCE:
+
+Disk Space Cleanup (run when disk usage is high):
+
+- Check disk usage: df -h /
+- Check Docker usage: docker system df
+- Clean build cache: docker builder prune -a -f
+- Clean unused volumes: docker volume prune -f
+- This can free up 6-8GB after multiple deployments
+
+Notes:
+
+- Database volumes persist between deployments (data is safe)
+- Only run volume prune if you're sure no important data is in unused volumes
+- Build cache will accumulate with each deployment
+- Monitor disk usage periodically to avoid running out of space
+
 If anything fails, report the error and ask the user for next steps. Do not try to fix the error or make code changes.
+
+$ARGUMENTS
