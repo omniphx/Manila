@@ -19,7 +19,6 @@ async function generateConversationTitle(userMessage: string): Promise<string> {
 "${userMessage}"
 
 Return ONLY the title, nothing else. Do not use quotes.`,
-      maxTokens: 20,
     });
 
     return result.text.trim() || 'New Conversation';

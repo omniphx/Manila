@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure } from '../trpc.js';
 import { folders } from '../../db/schema.js';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 
 export const foldersRouter = router({
   /**
@@ -71,7 +71,7 @@ export const foldersRouter = router({
         input.parentId === undefined
           ? eq(folders.userId, ctx.user.userId)
           : input.parentId === null
-          ? and(eq(folders.userId, ctx.user.userId), eq(folders.parentId, null))
+          ? and(eq(folders.userId, ctx.user.userId), isNull(folders.parentId))
           : and(
               eq(folders.userId, ctx.user.userId),
               eq(folders.parentId, input.parentId)
