@@ -198,6 +198,9 @@ export default function ChatPage() {
 
       // Refetch messages to get the new user message and AI response
       await refetchMessages();
+
+      // Refetch conversations to update the title (in case it was auto-generated)
+      await refetchConversations();
     } catch (err) {
       console.error('Failed to send message:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to send message. Please try again.';
@@ -453,7 +456,7 @@ export default function ChatPage() {
               {conversations.map((conv) => (
                 <div
                   key={conv.id}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors group ${
+                  className={`w-full flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors group ${
                     conv.id === conversationId ? 'bg-zinc-200 dark:bg-zinc-800' : ''
                   }`}
                 >
@@ -461,17 +464,17 @@ export default function ChatPage() {
                     onClick={() => setConversationId(conv.id)}
                     className="flex-1 flex items-center gap-2 text-left min-w-0 cursor-pointer"
                   >
-                    <ChatIcon className="w-4 h-4 text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 flex-shrink-0" />
+                    <ChatIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" />
                     <span className="text-sm text-zinc-700 dark:text-zinc-300 truncate">
                       {conv.title || 'New Conversation'}
                     </span>
                   </button>
                   <button
                     onClick={(e) => handleDeleteConversation(conv.id, e)}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-opacity flex-shrink-0 cursor-pointer"
+                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-all flex-shrink-0 cursor-pointer"
                     title="Delete conversation"
                   >
-                    <TrashIcon className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400" />
+                    <TrashIcon className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
                   </button>
                 </div>
               ))}
@@ -563,15 +566,23 @@ export default function ChatPage() {
             return (
               <div key={message.id} className="flex gap-4">
                 {/* Avatar */}
-                <div
-                  className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-medium ${
-                    message.role === "user"
-                      ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
-                      : "bg-[#6c47ff] text-white"
-                  }`}
-                >
-                  {message.role === "user" ? userInitials : "M"}
-                </div>
+                {message.role === "user" ? (
+                  userImageUrl ? (
+                    <img
+                      src={userImageUrl}
+                      alt={userName}
+                      className="w-8 h-8 rounded-full flex-shrink-0 object-cover"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 flex-shrink-0 flex items-center justify-center text-sm font-medium">
+                      {userInitials}
+                    </div>
+                  )
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-[#6c47ff] text-white flex-shrink-0 flex items-center justify-center text-sm font-medium">
+                    M
+                  </div>
+                )}
 
                 {/* Message Content */}
                 <div className="flex-1 min-w-0">
@@ -597,9 +608,11 @@ export default function ChatPage() {
                         >
                           <FileIcon className="w-3 h-3" />
                           <span>{citation.filename}</span>
-                          <span className="text-zinc-400 dark:text-zinc-500">
-                            p.{citation.page}
-                          </span>
+                          {citation.page && (
+                            <span className="text-zinc-400 dark:text-zinc-500">
+                              {citation.page}
+                            </span>
+                          )}
                         </button>
                       ))}
                     </div>
@@ -668,7 +681,7 @@ export default function ChatPage() {
               />
               <button
                 onClick={handleSendMessage}
-                className="absolute right-2 bottom-2 p-2 rounded-lg bg-[#6c47ff] text-white hover:bg-[#5a3ad6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-[#6c47ff] text-white hover:bg-[#5a3ad6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!inputValue.trim() || !conversationId || isTyping}
               >
                 <SendIcon className="w-4 h-4" />

@@ -4,6 +4,30 @@ import { router, protectedProcedure } from '../trpc.js';
 import { conversations, messages } from '../../db/schema.js';
 import { eq, desc } from 'drizzle-orm';
 import { generateChatWithTools } from '../../services/chat-with-tools.js';
+import { generateText } from 'ai';
+import { openai } from '@ai-sdk/openai';
+
+/**
+ * Generate a concise conversation title from the first user message
+ */
+async function generateConversationTitle(userMessage: string): Promise<string> {
+  try {
+    const result = await generateText({
+      model: openai.chat('gpt-4o'),
+      prompt: `Generate a very concise title (3-5 words maximum) for a conversation that starts with this user message:
+
+"${userMessage}"
+
+Return ONLY the title, nothing else. Do not use quotes.`,
+      maxTokens: 20,
+    });
+
+    return result.text.trim() || 'New Conversation';
+  } catch (error) {
+    console.error('[Chat] Error generating title:', error);
+    return 'New Conversation';
+  }
+}
 
 export const chatRouter = router({
   // Create a new conversation
@@ -152,11 +176,32 @@ export const chatRouter = router({
         })
         .returning();
 
-      // Update conversation's updatedAt timestamp
-      await ctx.db
-        .update(conversations)
-        .set({ updatedAt: new Date() })
-        .where(eq(conversations.id, input.conversationId));
+      // If this is the first user message, generate a title for the conversation
+      const allMessages = await ctx.db
+        .select()
+        .from(messages)
+        .where(eq(messages.conversationId, input.conversationId));
+
+      const userMessages = allMessages.filter(m => m.role === 'user');
+
+      if (userMessages.length === 1 && (conversation.title === 'New Conversation' || !conversation.title)) {
+        // Generate a title from the first user message
+        const generatedTitle = await generateConversationTitle(input.content);
+
+        await ctx.db
+          .update(conversations)
+          .set({
+            title: generatedTitle,
+            updatedAt: new Date()
+          })
+          .where(eq(conversations.id, input.conversationId));
+      } else {
+        // Just update the timestamp
+        await ctx.db
+          .update(conversations)
+          .set({ updatedAt: new Date() })
+          .where(eq(conversations.id, input.conversationId));
+      }
 
       return {
         userMessage,
