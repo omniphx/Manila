@@ -40,6 +40,7 @@
     "ai": "^5.0.104",
     "bcryptjs": "^2.4.3",
     "dotenv": "^16.3.1",
+    "drizzle-kit": "^0.24.0",
     "drizzle-orm": "^0.33.0",
     "fastify": "^5.6.2",
     "jsonwebtoken": "^9.0.2",
@@ -54,7 +55,6 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.5",
     "@types/node": "^20.10.6",
-    "drizzle-kit": "^0.24.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3",
     "vitest": "^1.1.0"
