@@ -21,7 +21,10 @@ export async function uploadFile(formData: FormData, folderId?: string | null) {
     }
 
     // Forward the file to the backend
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+    // Use absolute URL for server-side fetch in production, relative for local dev
+    const apiUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
     const response = await fetch(`${apiUrl}/upload`, {
       method: "POST",
       headers: {
