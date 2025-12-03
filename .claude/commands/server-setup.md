@@ -115,6 +115,52 @@ sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/too
 chsh -s $(which zsh)
 ```
 
+12 Setup nginx/SSL:
+
+```
+server {
+    listen 443 ssl;
+    server_name api.filellama.ai;
+
+    ssl_certificate /etc/letsencrypt/live/api.filellama.ai/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.filellama.ai/privkey.pem;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+Use Certbot and Let's Encrypt, which gives you free certificates that auto-renew.
+
+```sh
+sudo apt update
+sudo apt install certbot python3-certbot-nginx
+```
+
+Make sure nginx is installed and running
+
+```sh
+sudo apt install nginx
+sudo systemctl start nginx
+```
+
+Get the certificate (certbot will configure nginx for you)
+
+```sh
+sudo certbot --nginx -d api.filellama.ai
+```
+
+Before running certbot, make sure your DNS A record for api.filellama.ai is already pointing to your droplet's IP and has propagated (you can check with dig backend.yourdomain.com). Let's Encrypt validates domain ownership by hitting your server over HTTP, so port 80 needs to be open in your firewall.
+
+After it succeeds, you can test the auto-renewal with:
+
+```sh
+sudo certbot renew --dry-run
+```
+
 DROPLET INFORMATION:
 
 - Droplet IP: 104.248.66.216
