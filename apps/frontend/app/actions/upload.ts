@@ -21,10 +21,10 @@ export async function uploadFile(formData: FormData, folderId?: string | null) {
     }
 
     // Forward the file to the backend
-    // Use absolute URL for server-side fetch in production, relative for local dev
+    // Server Actions run server-side, so we need to call the backend API directly
     const apiUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+      ? "https://api.filellama.ai"  // Production: call backend directly
+      : "http://localhost:3000";      // Local: call local backend
     const response = await fetch(`${apiUrl}/upload`, {
       method: "POST",
       headers: {
