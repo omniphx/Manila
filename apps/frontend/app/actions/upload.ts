@@ -21,7 +21,8 @@ export async function uploadFile(formData: FormData, folderId?: string | null) {
     }
 
     // Forward the file to the backend
-    const response = await fetch("http://localhost:3000/upload", {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+    const response = await fetch(`${apiUrl}/upload`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,

@@ -1,8 +1,17 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
       "source": "/trpc/:path*",
       "destination": "https://api.filellama.ai/trpc/:path*"
+    },
+    {
+      "source": "/upload",
+      "destination": "https://api.filellama.ai/upload"
+    },
+    {
+      "source": "/files/:path*",
+      "destination": "https://api.filellama.ai/files/:path*"
     }
   ]
 }
