@@ -44,11 +44,11 @@ export function ProcessingStatus({ files }: ProcessingStatusProps) {
   return (
     <div className="flex gap-4">
       <div className="w-8 h-8 rounded-full bg-[#6c47ff] flex items-center justify-center text-sm font-medium text-white flex-shrink-0">
-        M
+        FL
       </div>
       <div className="flex-1">
         <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">
-          Manila
+          FileLlama
         </p>
         <div className="space-y-2">
           {files.map((file) => (

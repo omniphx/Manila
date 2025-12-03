@@ -4,10 +4,10 @@ export function Footer() {
       <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-md bg-[#6c47ff] flex items-center justify-center">
-            <span className="text-white font-bold text-xs">M</span>
+            <span className="text-white font-bold text-xs">FL</span>
           </div>
           <span className="text-sm text-zinc-500 dark:text-zinc-400">
-            Manila
+            FileLlama
           </span>
         </div>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">

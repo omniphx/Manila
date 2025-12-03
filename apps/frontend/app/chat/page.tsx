@@ -112,11 +112,11 @@ function TypingIndicator() {
   return (
     <div className="flex gap-4">
       <div className="w-8 h-8 rounded-full bg-[#6c47ff] flex items-center justify-center text-sm font-medium text-white flex-shrink-0">
-        M
+        FL
       </div>
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Manila</span>
+          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">FileLlama</span>
           <span className="text-xs text-zinc-400 dark:text-zinc-500">thinking...</span>
         </div>
         <div className="flex gap-1">
@@ -390,7 +390,7 @@ export default function ChatPage() {
         <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
           {sidebarOpen && (
             <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-              Manila
+              FileLlama
             </span>
           )}
           <button
@@ -580,7 +580,7 @@ export default function ChatPage() {
                   )
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-[#6c47ff] text-white flex-shrink-0 flex items-center justify-center text-sm font-medium">
-                    M
+                    FL
                   </div>
                 )}
 
@@ -588,7 +588,7 @@ export default function ChatPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      {message.role === "user" ? "You" : "Manila"}
+                      {message.role === "user" ? "You" : "FileLlama"}
                     </span>
                     <span className="text-xs text-zinc-400 dark:text-zinc-500">
                       {formatTime(message.createdAt)}
@@ -689,7 +689,7 @@ export default function ChatPage() {
             </div>
           </div>
           <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500 text-center">
-            Manila can make mistakes. Verify important information in your source documents.
+            FileLlama can make mistakes. Verify important information in your source documents.
           </p>
         </div>
       </div>

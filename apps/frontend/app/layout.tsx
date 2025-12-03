@@ -22,7 +22,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Manila",
+  title: "FileLlama",
   description: "Document RAG Scanner",
 };
 
@@ -45,10 +45,10 @@ export default function RootLayout({
                 {/* Logo/Brand */}
                 <Link href="/" className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-lg bg-[#6c47ff] flex items-center justify-center">
-                    <span className="text-white font-bold text-sm">M</span>
+                    <span className="text-white font-bold text-sm">FL</span>
                   </div>
                   <span className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
-                    Manila
+                    FileLlama
                   </span>
                 </Link>
 

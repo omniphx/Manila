@@ -335,7 +335,7 @@ export default function AccountPage() {
           <SettingsSection
             icon={PaletteIcon}
             title="Appearance"
-            description="Customize how Manila looks for you"
+            description="Customize how FileLlama looks for you"
           >
             <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
               <SettingRow
