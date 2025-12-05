@@ -1,123 +1,149 @@
-# Digital Ocean Setup command
+# Digital Ocean Setup Instructions
 
-I need help setting up a new DigitalOcean droplet for my application called Manila. This server will host a document management system with LLM-powered question answering.
+This server will host FileLlama, a document management system with LLM-powered question answering.
 
-Do not create a script or write code. Simply follow the setup instructions and execute each step.
+**Droplet Information:**
 
-SETUP INSTRUCTIONS:
+- IP: 143.110.194.149
+- OS: Ubuntu 24.04 (LTS) x64
+- Current access: root@143.110.194.149
 
-1 USER ACCOUNTS:
+> If reusing an IP, remove old host keys with `ssh-keygen -R 143.110.194.149`
 
-- Create two user accounts (both will use the same SSH key for authentication):
-  - Personal admin user: marty
-  - Agent/deployment user: agent
-- Both users should have sudo privileges
-- Create a group for both users called `devs`
-- Both users share the same SSH public key found in: `cat ~/.ssh/id_ed25519.pub`
+---
 
-> If reusing an IP, you'll need
-> to remove old host keys with ssh-keygen -R <IP>
+## 1. User Accounts
 
-2 VERIFY ACCESS
+Create two user accounts (both use the same SSH key):
+
+- **marty** - Personal admin user
+- **agent** - Deployment user
+
+Both should have sudo privileges and belong to a shared `devs` group.
+
+SSH public key: `cat ~/.ssh/id_ed25519.pub`
+
+---
+
+## 2. Verify Access
 
 - Test SSH and sudo for both users
-- Continue remaining steps as agent (this is important because in the next steps we will be removing root access)
+- Continue remaining steps as `agent` (important before disabling root access)
 
-3 SECURITY HARDENING:
+---
 
-- Disable root SSH login after setup
+## 3. Security Hardening
+
+- Disable root SSH login
 - Disable password authentication (SSH key only)
 - Configure UFW firewall (allow SSH, HTTP, HTTPS)
 - Set up fail2ban for brute force protection
 - Configure automatic security updates
 
-4 DOCKER SETUP:
+---
+
+## 4. Docker Setup
 
 - Install Docker and Docker Compose
-- Add both users to the docker group (no sudo needed for docker commands)
+- Add both users to the docker group
 - Configure Docker to start on boot
-- Add Docker log limits to prevent disk space issues:
+- Add log limits to `/etc/docker/daemon.json`:
 
-  ```json
-    # Add to /etc/docker/daemon.json
-    {
-      "log-driver": "json-file",
-      "log-opts": {
-        "max-size": "10m",
-        "max-file": "3"
-      }
-    }
-  ```
+```json
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+```
 
-5 APPLICATION DIRECTORY STRUCTURE:
+> Note: Users must log out and back in (or run `newgrp docker`) for group membership to take effect.
 
-- Create application directory at: /opt/manila
-- Create file storage directory at: /var/manila/files
-- Set appropriate permissions for both users to access these directories. Both users should share ownership with the `devs` group
+---
 
-6 DEVELOPMENT TOOLS:
+## 5. Container Registry Authentication
 
-- Install: git, curl, vim (or nano), htop
-- Configure timezone to: [PST, e.g., America/Los_Angeles]
-
-7 MONITORING/MAINTENANCE:
-
-- Set up logrotate for application logs
-- Configure basic system monitoring
-
-8 POSTGRESQL/DOCKER VOLUMES:
-
-- Create dedicated directory for database volumes: /var/manila/db
-- Set appropriate permissions for Docker to write to volume directories
-- Ensure sufficient disk space is available (check with df -h)
-- Verify swap is enabled for database performance
-
-9 Git Configuration for Deployment
-
-Add a step after user creation:
-
-- Configure git for both users (needed for deployments)
-
-git config --global user.name "Manila Deploy"
-git config --global user.email "<deploy@manila.app>"
-
-- setup ssh key: `ssh-keygen -t ed25519 -C "agent@manila-droplet"`
-- prompt user to add public key to [repo setting](hhttps://github.com/omniphx/Manila/settings/keys) with `cat ~/.ssh/id_ed25519.pub`
-- once completed test out the connection with `ssh -T git@github.com`
-- clone the repo: `git clone --depth 1 --branch main git@github.com:omniphx/manila.git /opt/manila`
-
-11 Node, pnpm
-
-- Install Node.js v22
-- Through node, enable corepack and install pnpm
-
-10 Testing Checklist
-
-- Test firewall: sudo ufw status verbose
-- Test fail2ban: sudo fail2ban-client status sshd
-- Verify no password auth: Try SSH with password
-- Check disk space alerts at 80% usage
-
-11 Configuration for user "marty"
-
-- Login as "marty"
-- Add "oh-my-zsh"
+Authenticate with GitHub Container Registry:
 
 ```bash
-# Install zsh
+echo "YOUR_GITHUB_PAT" | docker login ghcr.io -u omniphx --password-stdin
+```
+
+The PAT needs `read:packages` scope at minimum.
+
+---
+
+## 6. Application Directory Structure
+
+Create the following directories with `devs` group ownership:
+
+| Path                   | Purpose                    |
+| ---------------------- | -------------------------- |
+| `/opt/filellama`       | Docker compose and configs |
+| `/var/filellama/files` | Uploaded file storage      |
+| `/var/filellama/db`    | PostgreSQL volume data     |
+
+Ensure both `marty` and `agent` can read/write via the `devs` group.
+
+---
+
+## 7. Deploy Configuration Files
+
+Copy these files to `/opt/filellama` on the droplet:
+
+### docker-compose.yml
+
+Copy my local docker compose file:
+`scp apps/backend/docker-compose.prod.yml root@143.110.194.149:/opt/filellama/docker-compose.yml`
+
+### .env
+
+Copy my local .env file:
+`scp apps/backend/.env root@143.110.194.149:/opt/filellama/.env`
+
+Changed the production .env to use the Docker service name:
+`DATABASE_URL=postgresql://postgres:postgres@postgres:5432/manila`
+
+Secure the .env file:
+
+```bash
+chmod 600 /opt/filellama/.env
+```
+
+---
+
+## 8. System Configuration
+
+- Set timezone to America/Los_Angeles
+- Configure logrotate for `/var/filellama/files`
+- Verify swap is enabled (for database performance)
+- Check disk space with `df -h`
+
+---
+
+## 9. Nginx and SSL
+
+Install nginx and certbot:
+
+```bash
 sudo apt update
-sudo apt install zsh -y
-
-# Install oh-my-zsh
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-
-# Set zsh as default shell for marty
-chsh -s $(which zsh)
+sudo apt install nginx certbot python3-certbot-nginx
+sudo systemctl start nginx
 ```
 
-12 Setup nginx/SSL:
+Ensure DNS A record for `api.filellama.ai` points to the droplet IP before proceeding.
 
+Get the certificate:
+
+```bash
+sudo certbot --nginx -d api.filellama.ai
 ```
+
+Update nginx config at `/etc/nginx/sites-available/default`:
+
+```nginx
 server {
     listen 443 ssl;
     server_name api.filellama.ai;
@@ -126,47 +152,67 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/api.filellama.ai/privkey.pem;
 
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
     }
 }
 ```
 
-Use Certbot and Let's Encrypt, which gives you free certificates that auto-renew.
+Test auto-renewal:
 
-```sh
-sudo apt update
-sudo apt install certbot python3-certbot-nginx
-```
-
-Make sure nginx is installed and running
-
-```sh
-sudo apt install nginx
-sudo systemctl start nginx
-```
-
-Get the certificate (certbot will configure nginx for you)
-
-```sh
-sudo certbot --nginx -d api.filellama.ai
-```
-
-Before running certbot, make sure your DNS A record for api.filellama.ai is already pointing to your droplet's IP and has propagated (you can check with dig backend.yourdomain.com). Let's Encrypt validates domain ownership by hitting your server over HTTP, so port 80 needs to be open in your firewall.
-
-After it succeeds, you can test the auto-renewal with:
-
-```sh
+```bash
 sudo certbot renew --dry-run
 ```
 
-DROPLET INFORMATION:
+---
 
-- Droplet IP: 104.248.66.216
-- OS: Ubuntu 24.04 (LTS) x64
-- Current access: root@104.248.66.216
+## 10. Start the Application
 
-After completion, I should be able to SSH in as either user. Do not make any code changes.
+```bash
+cd /opt/filellama
+docker compose pull
+docker compose up -d
+docker compose logs -f
+```
 
-$ARGUMENTS
+---
+
+## 11. Verification Checklist
+
+- [ ] SSH works for both `marty` and `agent`
+- [ ] Root SSH login disabled
+- [ ] Password auth disabled (test with `ssh -o PreferredAuthentications=password`)
+- [ ] Firewall active: `sudo ufw status verbose`
+- [ ] Fail2ban running: `sudo fail2ban-client status sshd`
+- [ ] Docker runs without sudo: `docker ps`
+- [ ] Containers healthy: `docker compose ps`
+- [ ] HTTPS working: `curl https://api.filellama.ai/health`
+- [ ] Disk space adequate: `df -h` (alert threshold: 80%)
+
+---
+
+## Deployment Workflow
+
+When pushing updates:
+
+**Local machine:**
+
+```bash
+docker build -t ghcr.io/omniphx/filellama-backend:latest \
+  -f apps/backend/Dockerfile --target production .
+docker push ghcr.io/omniphx/filellama-backend:latest
+```
+
+**On droplet:**
+
+```bash
+cd /opt/filellama
+docker compose pull
+docker compose up -d
+```

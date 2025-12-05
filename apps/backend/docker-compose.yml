@@ -21,7 +21,7 @@ services:
     restart: always
 
   backend:
-    image: ghcr.io/omniphx/filellama-backend:latest
+    image: ghcr.io/YOUR_USERNAME/filellama-backend:latest
     container_name: filellama-backend
     env_file:
       - .env

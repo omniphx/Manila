@@ -1,10 +1,10 @@
-Deploy the Manila application to my DigitalOcean droplet.
+# Deploy the application to my DigitalOcean droplet
 
 DROPLET INFORMATION:
 
-- Droplet IP: [request if not provided already]
+- Droplet IP: 143.110.194.149
 - OS: Ubuntu 24.04 (LTS) x64
-- Current access: root@[request if not provided already]
+- Current access: root@143.110.194.149
 
 Steps:
 
