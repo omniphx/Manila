@@ -2,9 +2,9 @@
 
 DROPLET INFORMATION:
 
-- IP: 143.110.194.149
+- IP: <DOCKER_IP_ADDRESS>
 - OS: Ubuntu 24.04 (LTS) x64
-- Current access: root@143.110.194.149
+- Current access: root@<DOCKER_IP_ADDRESS>
 
 ## Steps
 
@@ -17,13 +17,13 @@ docker buildx build --platform linux/amd64 -t ghcr.io/omniphx/filellama-backend:
 
 ### Copy and compose docker
 
-SSH as: agent@143.110.194.149
+SSH as: marty@<DOCKER_IP_ADDRESS>
 
 Copy my local docker compose file:
-`scp apps/backend/docker-compose.prod.yml root@143.110.194.149:/opt/filellama/docker-compose.yml`
+`scp apps/backend/docker-compose.prod.yml root@<DOCKER_IP_ADDRESS>:/opt/filellama/docker-compose.yml`
 
 Copy my local .env file:
-`scp apps/backend/.env root@143.110.194.149:/opt/filellama/.env`
+`scp apps/backend/.env root@<DOCKER_IP_ADDRESS>:/opt/filellama/.env`
 
 Changed the production .env to use the Docker service name:
 `DATABASE_URL=postgresql://postgres:postgres@postgres:5432/manila`

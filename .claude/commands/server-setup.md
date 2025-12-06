@@ -4,11 +4,11 @@ This server will host FileLlama, a document management system with LLM-powered q
 
 **Droplet Information:**
 
-- IP: 143.110.194.149
+- IP: <DOCKER_IP_ADDRESS>
 - OS: Ubuntu 24.04 (LTS) x64
-- Current access: root@143.110.194.149
+- Current access: root@<DOCKER_IP_ADDRESS>
 
-> If reusing an IP, remove old host keys with `ssh-keygen -R 143.110.194.149`
+> If reusing an IP, remove old host keys with `ssh-keygen -R <DOCKER_IP_ADDRESS>`
 
 ---
 
@@ -19,7 +19,7 @@ Create two user accounts (both use the same SSH key):
 - **marty** - Personal admin user
 - **agent** - Deployment user
 
-Both should have sudo privileges and belong to a shared `devs` group.
+Both marty and agent should have sudo privileges and belong to a shared `devs` group.
 
 SSH public key: `cat ~/.ssh/id_ed25519.pub`
 
@@ -39,6 +39,8 @@ SSH public key: `cat ~/.ssh/id_ed25519.pub`
 - Configure UFW firewall (allow SSH, HTTP, HTTPS)
 - Set up fail2ban for brute force protection
 - Configure automatic security updates
+- X11 Forwarding Enabled
+- Set SSH max auth tries to 3
 
 ---
 
@@ -96,12 +98,24 @@ Copy these files to `/opt/filellama` on the droplet:
 ### docker-compose.yml
 
 Copy my local docker compose file:
-`scp apps/backend/docker-compose.prod.yml root@143.110.194.149:/opt/filellama/docker-compose.yml`
+`scp apps/backend/docker-compose.prod.yml root@<DOCKER_IP_ADDRESS>:/opt/filellama/docker-compose.yml`
+
+Make sure we only expose localhost ports:
+
+```bash
+ports: - "5432:5432" # WRONG - exposes to internet
+ports: - "127.0.0.1:5432:5432" # CORRECT - localhost only
+```
+
+```bash
+ports: - "3000:3000" # WRONG - exposes to internet
+ports: - "127.0.0.1:3000:3000" # CORRECT - localhost only
+```
 
 ### .env
 
 Copy my local .env file:
-`scp apps/backend/.env root@143.110.194.149:/opt/filellama/.env`
+`scp apps/backend/.env root@<DOCKER_IP_ADDRESS>:/opt/filellama/.env`
 
 Changed the production .env to use the Docker service name:
 `DATABASE_URL=postgresql://postgres:postgres@postgres:5432/manila`
@@ -170,9 +184,13 @@ Test auto-renewal:
 sudo certbot renew --dry-run
 ```
 
+Add Nginx Rate Limiting
+
 ---
 
 ## 10. Start the Application
+
+Be sure to run docker with the docker user.
 
 ```bash
 cd /opt/filellama
@@ -194,6 +212,7 @@ docker compose logs -f
 - [ ] Containers healthy: `docker compose ps`
 - [ ] HTTPS working: `curl https://api.filellama.ai/health`
 - [ ] Disk space adequate: `df -h` (alert threshold: 80%)
+- [ ] Make sure no database ports are exposed
 
 ---
 

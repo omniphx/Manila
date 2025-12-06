@@ -23,6 +23,10 @@ pnpm install
 
 ### Environment Variables
 
+#### Claude specific
+
+For non-app related environment variables search in `.claude/.env`
+
 #### Backend
 
 The backend requires environment variables to be configured. Copy the example file and fill in the values:
