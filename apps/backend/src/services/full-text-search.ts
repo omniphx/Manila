@@ -6,10 +6,7 @@ import { eq, and, sql, gte, lte } from 'drizzle-orm';
  * Search filters for document search
  */
 export interface SearchFilters {
-  documentType?: string;
-  documentYear?: string;
-  dateFrom?: Date;
-  dateTo?: Date;
+  // Reserved for future filtering options
 }
 
 /**
@@ -18,9 +15,6 @@ export interface SearchFilters {
 export interface SearchResult {
   id: string;
   filename: string;
-  documentType: string | null;
-  documentYear: string | null;
-  documentDate: Date | null;
   snippet: string;
   rank: number;
   headline: string; // Highlighted snippet with matched terms
@@ -43,9 +37,6 @@ export interface SearchResponse {
 export interface DocumentContent {
   id: string;
   filename: string;
-  documentType: string | null;
-  documentYear: string | null;
-  documentDate: Date | null;
   mimeType: string;
   size: string;
   content: string;
@@ -87,22 +78,6 @@ export async function searchDocuments(
   // Build WHERE conditions
   const conditions: any[] = [eq(files.userId, userId)];
 
-  if (filters.documentType) {
-    conditions.push(eq(files.documentType, filters.documentType));
-  }
-
-  if (filters.documentYear) {
-    conditions.push(eq(files.documentYear, filters.documentYear));
-  }
-
-  if (filters.dateFrom) {
-    conditions.push(gte(files.documentDate, filters.dateFrom));
-  }
-
-  if (filters.dateTo) {
-    conditions.push(lte(files.documentDate, filters.dateTo));
-  }
-
   // Add full-text search condition
   if (tsQuery) {
     conditions.push(sql`${files.searchVector} @@ to_tsquery('english', ${tsQuery})`);
@@ -113,9 +88,6 @@ export async function searchDocuments(
     .select({
       id: files.id,
       filename: files.originalFilename,
-      documentType: files.documentType,
-      documentYear: files.documentYear,
-      documentDate: files.documentDate,
       snippet: sql<string>`LEFT(${files.extractedContent}, 500)`,
       rank: sql<number>`ts_rank(${files.searchVector}, to_tsquery('english', ${tsQuery}))`,
       headline: sql<string>`ts_headline('english', ${files.extractedContent}, to_tsquery('english', ${tsQuery}), 'MaxWords=50, MinWords=25, ShortWord=3, HighlightAll=FALSE, MaxFragments=3, FragmentDelimiter=" ... "')`,
@@ -145,9 +117,6 @@ export async function searchDocuments(
     results: paginatedResults.map((r) => ({
       id: r.id,
       filename: r.filename,
-      documentType: r.documentType,
-      documentYear: r.documentYear,
-      documentDate: r.documentDate,
       snippet: r.snippet || '',
       rank: r.rank,
       headline: r.headline || r.snippet || '',
@@ -175,9 +144,6 @@ export async function getDocument(
     .select({
       id: files.id,
       filename: files.originalFilename,
-      documentType: files.documentType,
-      documentYear: files.documentYear,
-      documentDate: files.documentDate,
       mimeType: files.mimeType,
       size: files.size,
       content: files.extractedContent,
@@ -200,9 +166,6 @@ export async function getDocument(
   return {
     id: document.id,
     filename: document.filename,
-    documentType: document.documentType,
-    documentYear: document.documentYear,
-    documentDate: document.documentDate,
     mimeType: document.mimeType,
     size: document.size,
     content,

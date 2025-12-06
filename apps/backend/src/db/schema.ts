@@ -30,10 +30,7 @@ export const files = pgTable('files', {
   extractedContent: text('extracted_content'),
   processingStatus: varchar('processing_status', { length: 50 }).notNull().default('pending'), // pending, processing, completed, failed
   processingError: text('processing_error'),
-  // Full-text search columns
-  documentType: varchar('document_type', { length: 100 }), // e.g., 'pdf', 'tax_form', 'invoice', 'contract'
-  documentYear: varchar('document_year', { length: 4 }), // Year for tax documents, reports, etc.
-  documentDate: timestamp('document_date'), // Document date if available
+  // Full-text search column
   searchVector: tsvector('search_vector'), // tsvector for full-text search, computed from content + title
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

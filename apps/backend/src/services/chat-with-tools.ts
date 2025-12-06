@@ -12,22 +12,6 @@ const searchDocumentsSchema = z.object({
     .describe(
       'Search keywords or phrase. Use full expanded terms instead of acronyms (e.g., "adjusted gross income" not "AGI", "individual retirement account" not "IRA"). Examples: "tax deduction", "2023 income", "adjusted gross income"'
     ),
-  documentType: z
-    .string()
-    .describe('Filter by document type (e.g., "tax_form", "invoice")')
-    .optional(),
-  documentYear: z
-    .string()
-    .describe('Filter by year (e.g., "2023")')
-    .optional(),
-  dateFrom: z
-    .string()
-    .describe("Filter documents from this date (ISO format)")
-    .optional(),
-  dateTo: z
-    .string()
-    .describe("Filter documents up to this date (ISO format)")
-    .optional(),
   page: z
     .number()
     .describe("Page number for pagination")
@@ -62,38 +46,24 @@ function createTools(userId: string) {
       description: `Search through the user's uploaded documents using keywords.
       Use this to find relevant documents before answering questions.
       Returns document summaries with highlighted snippets showing matched text.
-      You can filter by document type (e.g., 'tax_form', 'invoice', 'contract') and date ranges.
 
       IMPORTANT: Always expand acronyms to their full form when searching (e.g., use "adjusted gross income" instead of "AGI").`,
       inputSchema: searchDocumentsSchema,
       execute: async (args) => {
         const {
           query,
-          documentType,
-          documentYear,
-          dateFrom,
-          dateTo,
           page = 1,
           pageSize = 10,
         } = args;
         console.log(`[Tool] search_documents called:`, {
           query,
-          documentType,
-          documentYear,
           page,
         });
-
-        const filters = {
-          documentType,
-          documentYear,
-          dateFrom: dateFrom ? new Date(dateFrom) : undefined,
-          dateTo: dateTo ? new Date(dateTo) : undefined,
-        };
 
         const results = await searchDocuments(
           userId,
           query,
-          filters,
+          {},
           page,
           pageSize
         );
@@ -103,9 +73,6 @@ function createTools(userId: string) {
           results: results.results.map((r) => ({
             id: r.id,
             filename: r.filename,
-            type: r.documentType,
-            year: r.documentYear,
-            date: r.documentDate,
             snippet: r.headline, // Use highlighted headline
             relevance: r.rank,
           })),
@@ -139,9 +106,6 @@ function createTools(userId: string) {
           success: true,
           id: document.id,
           filename: document.filename,
-          type: document.documentType,
-          year: document.documentYear,
-          date: document.documentDate,
           mimeType: document.mimeType,
           size: document.size,
           content: document.content,
@@ -158,7 +122,6 @@ function createTools(userId: string) {
 export interface Citation {
   documentId: string;
   filename: string;
-  documentType: string | null;
   snippet?: string;
 }
 
@@ -300,7 +263,6 @@ Be concise and helpful. Focus on answering the user's specific question based on
                   citations.push({
                     documentId: doc.id,
                     filename: doc.filename,
-                    documentType: doc.type,
                     snippet: doc.snippet,
                   });
                 }
@@ -316,7 +278,6 @@ Be concise and helpful. Focus on answering the user's specific question based on
                 citations.push({
                   documentId: result.id,
                   filename: result.filename,
-                  documentType: result.type,
                 });
               }
             }
