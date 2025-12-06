@@ -4,48 +4,58 @@ import { z } from "zod";
 import { searchDocuments, getDocument } from "./full-text-search.js";
 
 /**
+ * Zod schemas for tool inputs
+ */
+const searchDocumentsSchema = z.object({
+  query: z
+    .string()
+    .describe(
+      'Search keywords or phrase. Use full expanded terms instead of acronyms (e.g., "adjusted gross income" not "AGI", "individual retirement account" not "IRA"). Examples: "tax deduction", "2023 income", "adjusted gross income"'
+    ),
+  documentType: z
+    .string()
+    .describe('Filter by document type (e.g., "tax_form", "invoice")')
+    .optional(),
+  documentYear: z
+    .string()
+    .describe('Filter by year (e.g., "2023")')
+    .optional(),
+  dateFrom: z
+    .string()
+    .describe("Filter documents from this date (ISO format)")
+    .optional(),
+  dateTo: z
+    .string()
+    .describe("Filter documents up to this date (ISO format)")
+    .optional(),
+  page: z
+    .number()
+    .describe("Page number for pagination")
+    .optional(),
+  pageSize: z
+    .number()
+    .describe("Results per page (max 50)")
+    .optional(),
+});
+
+const getDocumentSchema = z.object({
+  documentId: z.string().describe("The document ID from search results"),
+  maxLength: z
+    .number()
+    .describe("Maximum characters to return (default 50000)")
+    .optional(),
+});
+
+/**
+ * Infer TypeScript types from Zod schemas
+ */
+type SearchDocumentsInput = z.infer<typeof searchDocumentsSchema>;
+type GetDocumentInput = z.infer<typeof getDocumentSchema>;
+
+/**
  * Create tool definitions with userId bound
  */
 function createTools(userId: string) {
-  const searchDocumentsSchema = z.object({
-    query: z
-      .string()
-      .describe(
-        'Search keywords or phrase. Use full expanded terms instead of acronyms (e.g., "adjusted gross income" not "AGI", "individual retirement account" not "IRA"). Examples: "tax deduction", "2023 income", "adjusted gross income"'
-      ),
-    documentType: z
-      .string()
-      .describe('Filter by document type (e.g., "tax_form", "invoice")')
-      .optional(),
-    documentYear: z
-      .string()
-      .describe('Filter by year (e.g., "2023")')
-      .optional(),
-    dateFrom: z
-      .string()
-      .describe("Filter documents from this date (ISO format)")
-      .optional(),
-    dateTo: z
-      .string()
-      .describe("Filter documents up to this date (ISO format)")
-      .optional(),
-    page: z
-      .number()
-      .describe("Page number for pagination")
-      .optional(),
-    pageSize: z
-      .number()
-      .describe("Results per page (max 50)")
-      .optional(),
-  });
-
-  const getDocumentSchema = z.object({
-    documentId: z.string().describe("The document ID from search results"),
-    maxLength: z
-      .number()
-      .describe("Maximum characters to return (default 50000)")
-      .optional(),
-  });
 
   return {
     search_documents: tool({
@@ -257,19 +267,17 @@ Be concise and helpful. Focus on answering the user's specific question based on
             const toolCall = step.toolCalls[i];
             const toolResult = step.toolResults[i];
 
-            // Get the input/args from the toolCall - AI SDK v4 uses different structures
-            const toolInput = (toolCall as any).input || toolCall.args;
-
             // Store tool call details for debugging
             toolCallDetails.push({
               toolName: toolCall.toolName,
-              args: toolInput as Record<string, any>,
+              args: toolCall.input as Record<string, any>,
               result: toolResult,
             });
 
-            // Generate user-friendly activity messages
+            // Generate user-friendly activity messages with proper type narrowing
             if (toolCall.toolName === "search_documents") {
-              const query = toolInput?.query || "unknown query";
+              const searchInput = toolCall.input as SearchDocumentsInput;
+              const query = searchInput.query || "unknown query";
               console.log('[Chat] Extracted search query:', query);
               activities.push({
                 action: "search",

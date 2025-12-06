@@ -2,23 +2,47 @@
 
 DROPLET INFORMATION:
 
-- Droplet IP: 143.110.194.149
+- IP: 143.110.194.149
 - OS: Ubuntu 24.04 (LTS) x64
 - Current access: root@143.110.194.149
 
-Steps:
+## Steps
 
-1. SSH as: agent@104.248.66.216
-2. cd /opt/manila
-3. git pull origin main
-4. Navigate to backend folder: apps/backend
-5. pnpm docker:prod:down
-6. pnpm docker:prod (this can take several minutes)
-7. docker compose ps (verify all containers are running)
-8. docker compose logs -f (check for errors)
-9. pnpm db:migrate
+### Build docker image
 
-OPTIONAL MAINTENANCE:
+```sh
+docker buildx build --platform linux/amd64 -t ghcr.io/omniphx/filellama-backend:latest -f apps/backend/Dockerfile --target production . --push
+
+```
+
+### Copy and compose docker
+
+SSH as: agent@143.110.194.149
+
+Copy my local docker compose file:
+`scp apps/backend/docker-compose.prod.yml root@143.110.194.149:/opt/filellama/docker-compose.yml`
+
+Copy my local .env file:
+`scp apps/backend/.env root@143.110.194.149:/opt/filellama/.env`
+
+Changed the production .env to use the Docker service name:
+`DATABASE_URL=postgresql://postgres:postgres@postgres:5432/manila`
+
+```bash
+cd /opt/filellama
+docker compose pull
+docker compose up -d
+# verify all containers are running
+docker compose ps
+# check for errors
+docker compose logs -f
+```
+
+### Migrate any database changes
+
+1. pnpm db:migrate
+
+## OPTIONAL MAINTENANCE
 
 Disk Space Cleanup (run when disk usage is high):
 
