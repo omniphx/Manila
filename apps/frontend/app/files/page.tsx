@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -186,6 +186,7 @@ export default function FilesPage() {
   const [newFolderName, setNewFolderName] = useState("");
   const [draggedFileId, setDraggedFileId] = useState<string | null>(null);
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+  const [recentUploadTime, setRecentUploadTime] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useUser();
   const utils = trpc.useUtils();
@@ -196,15 +197,21 @@ export default function FilesPage() {
     offset: 0,
   }, {
     retry: false, // Don't retry on auth errors
-    refetchInterval: (data) => {
-      // Poll every 2 seconds if any files are processing
+    refetchInterval: (query) => {
+      const data = query.state.data;
       if (!data || !Array.isArray(data)) return false;
 
       const hasProcessingFiles = data.some(
         (file) => file.processingStatus === 'processing' || file.processingStatus === 'pending'
       );
-      return hasProcessingFiles ? 2000 : false;
+
+      // If there was a recent upload, keep polling for 30 seconds
+      const hasRecentUpload = recentUploadTime && (Date.now() - recentUploadTime < 30000);
+
+      return (hasProcessingFiles || hasRecentUpload) ? 2000 : false;
     },
+    // Also refetch when window regains focus
+    refetchOnWindowFocus: true,
   });
 
   // Fetch folders from backend
@@ -233,10 +240,26 @@ export default function FilesPage() {
   const userInitials = getInitials(user?.firstName, user?.lastName);
   const userImageUrl = user?.imageUrl;
 
+  // Track when new files are detected (indicates recent upload)
+  useEffect(() => {
+    if (filesData && filesData.length > 0) {
+      const latestFile = filesData[0]; // Files are sorted by createdAt DESC
+      const fileAge = Date.now() - new Date(latestFile.createdAt).getTime();
+
+      // If there's a very recent file (< 5 seconds old), mark as recent upload
+      if (fileAge < 5000 && !recentUploadTime) {
+        setRecentUploadTime(Date.now());
+      }
+    }
+  }, [filesData]);
+
   const handleFilesDropped = async (files: File[]) => {
     if (files.length === 0) return;
 
     setIsUploading(true);
+    // Mark upload time to enable polling
+    setRecentUploadTime(Date.now());
+
     try {
       for (const file of files) {
         const formData = new FormData();

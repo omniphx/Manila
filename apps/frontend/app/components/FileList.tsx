@@ -6,24 +6,48 @@ import { useState, useEffect } from "react";
 
 export function FileList() {
   const { getToken } = useAuth();
+  const [recentUploadTime, setRecentUploadTime] = useState<number | null>(null);
+
   const { data: files, isLoading, error } = trpc.files.list.useQuery(
     { limit: 20, offset: 0 },
     {
-      // Poll every 3 seconds if any files are being processed
+      // Poll every 3 seconds if:
+      // 1. Any files are processing OR
+      // 2. Less than 30 seconds since last upload (to catch fast processing)
       refetchInterval: (query) => {
         const data = query.state.data;
         if (!data || !Array.isArray(data)) return false;
+
         const hasProcessing = data.some(
           (file) => file.processingStatus === 'pending' || file.processingStatus === 'processing'
         );
-        return hasProcessing ? 3000 : false;
+
+        // If there was a recent upload, keep polling for 30 seconds
+        const hasRecentUpload = recentUploadTime && (Date.now() - recentUploadTime < 30000);
+
+        return (hasProcessing || hasRecentUpload) ? 3000 : false;
       },
+      // Also refetch when window regains focus
+      refetchOnWindowFocus: true,
     }
   );
   const deleteMutation = trpc.files.delete.useMutation();
   const utils = trpc.useUtils();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [viewingContent, setViewingContent] = useState<{ id: string; filename: string; content: string } | null>(null);
+
+  // Track when new files are detected (indicates recent upload)
+  useEffect(() => {
+    if (files && files.length > 0) {
+      const latestFile = files[0]; // Files are sorted by createdAt DESC
+      const fileAge = Date.now() - new Date(latestFile.createdAt).getTime();
+
+      // If there's a very recent file (< 5 seconds old), mark as recent upload
+      if (fileAge < 5000 && !recentUploadTime) {
+        setRecentUploadTime(Date.now());
+      }
+    }
+  }, [files]);
 
   // Debug logging
   useEffect(() => {
