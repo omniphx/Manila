@@ -33,6 +33,7 @@ cp .env.example .env
 ```
 
 Required environment variables:
+
 - `DATABASE_URL` - PostgreSQL connection string
 - `CLERK_PUBLISHABLE_KEY` - Clerk authentication public key
 - `CLERK_SECRET_KEY` - Clerk authentication secret key
@@ -146,11 +147,13 @@ The backend is a Fastify server with tRPC for type-safe API endpoints.
 **Database schema**: `src/db/schema.ts` - Drizzle schema definitions for users, refresh_tokens, and embeddings tables
 
 **tRPC routers**:
+
 - `src/trpc/router.ts` - Main router that combines all sub-routers
 - `src/trpc/routers/*` - Individual route handlers (health, embeddings)
 - `src/trpc/context.ts` - Context creation with Clerk auth and database access
 
 **Environment**:
+
 - Uses `.env` for all environments (development and production)
 - Schema validation via Zod in `src/lib/env.ts`
 - Build output: `dist/`
@@ -175,6 +178,7 @@ pnpm db:stop
 ```
 
 **Database commands:**
+
 ```bash
 cd apps/backend
 
@@ -211,6 +215,7 @@ pnpm docker:prod:clean      # Clean up production volumes and containers
 ```
 
 The backend exposes endpoints:
+
 - `/` - API info and available endpoints
 - `/health` - Health check endpoint
 - `/trpc` - tRPC endpoint for all API procedures
@@ -241,11 +246,13 @@ The frontend uses Next.js App Router with Server Components, providing fast deve
 - **Entry point**: `app/_layout.tsx` - Root layout with ClerkProvider and navigation setup
 
 **App structure:**
+
 - `app/(tabs)/` - Main tab navigation screens
 - `app/(auth)/` - Authentication screens (sign-in, sign-up)
 - `app/modal.tsx` - Modal screen example
 
 **Running mobile:**
+
 ```bash
 cd apps/mobile
 
@@ -286,6 +293,7 @@ When adding dependencies:
 ## TypeScript Configuration
 
 Each package has its own `tsconfig.json` with appropriate settings for its environment:
+
 - **Backend**: Node.js environment with ES2022 target and ESNext modules
 - **Frontend**: DOM environment with Next.js plugin and path aliases (`@/*`)
 - **Mobile**: Expo base config with React Native environment
@@ -318,3 +326,9 @@ apps/frontend/app/mockups/
 └── my-feature/         # Your mockup
     └── page.tsx
 ```
+
+## Package documentation
+
+Always use context7 when I need code generation, setup or configuration steps, or
+library/API documentation. This means you should automatically use the Context7 MCP
+tools to resolve library id and get library docs without me having to explicitly ask.
