@@ -22,8 +22,66 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FileLlama",
-  description: "Document RAG Scanner",
+  title: {
+    default: "FileLlama - Chat with Your Documents Using AI",
+    template: "%s | FileLlama",
+  },
+  description:
+    "Upload PDFs, Word docs, and text files. Ask questions in plain English and get instant answers with citations from your documents. Like ChatGPT for your files.",
+  keywords: [
+    "document chat",
+    "AI document analysis",
+    "PDF chat",
+    "document Q&A",
+    "AI document assistant",
+    "document search",
+    "ChatGPT for documents",
+    "document intelligence",
+    "file chat",
+    "AI file analysis",
+  ],
+  authors: [{ name: "FileLlama" }],
+  creator: "FileLlama",
+  publisher: "FileLlama",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || "https://filellama.com"
+  ),
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "/",
+    title: "FileLlama - Chat with Your Documents Using AI",
+    description:
+      "Upload PDFs, Word docs, and text files. Ask questions in plain English and get instant answers with citations from your documents.",
+    siteName: "FileLlama",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "FileLlama - Chat with Your Documents Using AI",
+    description:
+      "Upload PDFs, Word docs, and text files. Ask questions in plain English and get instant answers with citations.",
+    creator: "@filellama",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  verification: {
+    // Add these when you have them:
+    // google: 'your-google-verification-code',
+    // yandex: 'your-yandex-verification-code',
+    // bing: 'your-bing-verification-code',
+  },
 };
 
 export default function RootLayout({

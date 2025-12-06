@@ -1,4 +1,4 @@
-# Backend - File RAG Scanner
+# Backend - FileLlama
 
 A production-ready backend API built with Fastify, tRPC v11, PostgreSQL with pgvector, and Drizzle ORM.
 
@@ -78,10 +78,10 @@ Edit `.env.development` with your database credentials.
 ```bash
 # If using Docker for just the database:
 docker run -d \
-  --name fileragscanner-postgres \
+  --name filellama-postgres \
   -e POSTGRES_USER=postgres \
   -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=fileragscanner \
+  -e POSTGRES_DB=filellama \
   -p 5432:5432 \
   ankane/pgvector:latest
 ```
@@ -483,20 +483,20 @@ See `.env.example` for all available environment variables:
 ### Build Docker Image
 
 ```bash
-docker build -t fileragscanner-backend --target production .
+docker build -t filellama-backend --target production .
 ```
 
 ### Run in Production
 
 ```bash
 docker run -d \
-  --name fileragscanner-backend \
+  --name filellama-backend \
   -p 3000:3000 \
   -e NODE_ENV=production \
   -e DATABASE_URL=your_production_database_url \
   -e JWT_ACCESS_SECRET=your_access_secret \
   -e JWT_REFRESH_SECRET=your_refresh_secret \
-  fileragscanner-backend
+  filellama-backend
 ```
 
 ## Testing
@@ -567,4 +567,4 @@ If you get errors about the vector type, ensure you're using the `ankane/pgvecto
 
 ## License
 
-Private - Part of File RAG Scanner monorepo
+Private - Part of FileLlama monorepo
