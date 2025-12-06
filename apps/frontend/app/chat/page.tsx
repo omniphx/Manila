@@ -626,6 +626,7 @@ Be concise and helpful. Focus on answering the user's specific question.`}
           {messages.map((message) => {
             const metadata = message.metadata ? JSON.parse(message.metadata) : null;
             const citations = metadata?.citations || [];
+            const toolCallDetails = metadata?.toolCallDetails || [];
 
             return (
               <div key={message.id} className="flex gap-4">
@@ -664,6 +665,49 @@ Be concise and helpful. Focus on answering the user's specific question.`}
                       </span>
                     )}
                   </div>
+
+                  {/* Debug: Show tool calls before message content */}
+                  {debugMode && isDevelopment && message.role === "assistant" && toolCallDetails.length > 0 && (
+                    <div className="mb-3 space-y-2">
+                      <div className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                        Tool Calls ({toolCallDetails.length}):
+                      </div>
+                      {toolCallDetails.map((toolCall: any, index: number) => (
+                        <details key={index} className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-lg">
+                          <summary className="px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/20 rounded-lg">
+                            {index + 1}. {toolCall.toolName}
+                            {toolCall.toolName === 'search_documents' && toolCall.args?.query && (
+                              <span className="ml-2 font-mono text-amber-600 dark:text-amber-500">
+                                query: "{toolCall.args.query}"
+                              </span>
+                            )}
+                            {toolCall.toolName === 'get_document' && toolCall.args?.documentId && (
+                              <span className="ml-2 font-mono text-amber-600 dark:text-amber-500">
+                                documentId: {toolCall.args.documentId.substring(0, 8)}...
+                              </span>
+                            )}
+                          </summary>
+                          <div className="px-3 pb-3 pt-1 space-y-2">
+                            <div>
+                              <div className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Arguments:</div>
+                              <pre className="text-xs text-zinc-600 dark:text-zinc-400 bg-white dark:bg-zinc-900 rounded p-2 overflow-x-auto border border-amber-200 dark:border-amber-800">
+                                {JSON.stringify(toolCall.args, null, 2)}
+                              </pre>
+                            </div>
+                            {toolCall.result && (
+                              <div>
+                                <div className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Result:</div>
+                                <pre className="text-xs text-zinc-600 dark:text-zinc-400 bg-white dark:bg-zinc-900 rounded p-2 overflow-x-auto border border-amber-200 dark:border-amber-800 max-h-48">
+                                  {JSON.stringify(toolCall.result, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        </details>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">
                     {message.content}
                   </div>

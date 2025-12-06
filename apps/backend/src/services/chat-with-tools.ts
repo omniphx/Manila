@@ -153,12 +153,22 @@ export interface Citation {
 }
 
 /**
+ * Tool call information for debugging
+ */
+export interface ToolCallInfo {
+  toolName: string;
+  args: Record<string, any>;
+  result?: any;
+}
+
+/**
  * Chat response with tool-based document retrieval
  */
 export interface ChatResponse {
   answer: string;
   citations: Citation[];
   toolCalls: number;
+  toolCallDetails?: ToolCallInfo[];
 }
 
 /**
@@ -218,8 +228,9 @@ Be concise and helpful. Focus on answering the user's specific question.`;
       },
     });
 
-    // Extract citations from tool calls
+    // Extract citations and tool call details from tool calls
     const citations: Citation[] = [];
+    const toolCallDetails: ToolCallInfo[] = [];
     const toolCalls = result.steps?.length || 0;
 
     if (result.steps) {
@@ -228,6 +239,13 @@ Be concise and helpful. Focus on answering the user's specific question.`;
           for (let i = 0; i < step.toolCalls.length; i++) {
             const toolCall = step.toolCalls[i];
             const toolResult = step.toolResults[i];
+
+            // Store tool call details for debugging
+            toolCallDetails.push({
+              toolName: toolCall.toolName,
+              args: toolCall.args as Record<string, any>,
+              result: toolResult,
+            });
 
             if (toolCall.toolName === "search_documents" && toolResult) {
               const searchResults = toolResult as any;
@@ -315,6 +333,7 @@ Please provide a concise answer and cite the document name in your response.`,
       answer,
       citations: uniqueCitations,
       toolCalls,
+      toolCallDetails,
     };
   } catch (error) {
     console.error("[Chat] Error generating response:", error);
