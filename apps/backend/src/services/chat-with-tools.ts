@@ -262,7 +262,10 @@ Be concise and helpful. Focus on answering the user's specific question based on
 
             // Generate user-friendly activity messages
             if (toolCall.toolName === "search_documents") {
-              const query = (toolCall.args as any)?.query || "documents";
+              const args = toolCall.args as any;
+              console.log('[Chat] Tool call args:', JSON.stringify(args, null, 2));
+              const query = args?.query || args || "unknown query";
+              console.log('[Chat] Extracted query:', query);
               activities.push({
                 action: "search",
                 details: query,
