@@ -161,7 +161,7 @@ export const chatRouter = router({
         historyForLLM
       );
 
-      // Save AI response with citations and tool call details
+      // Save AI response with citations, tool call details, and activities
       const [assistantMessage] = await ctx.db
         .insert(messages)
         .values({
@@ -172,6 +172,7 @@ export const chatRouter = router({
             citations: chatResult.citations,
             toolCalls: chatResult.toolCalls,
             toolCallDetails: chatResult.toolCallDetails,
+            activities: chatResult.activities,
           }),
         })
         .returning();

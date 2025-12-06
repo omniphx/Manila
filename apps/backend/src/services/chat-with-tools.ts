@@ -162,6 +162,14 @@ export interface ToolCallInfo {
 }
 
 /**
+ * User-friendly activity message for tool calls
+ */
+export interface ToolActivity {
+  action: string;
+  details: string;
+}
+
+/**
  * Chat response with tool-based document retrieval
  */
 export interface ChatResponse {
@@ -169,6 +177,7 @@ export interface ChatResponse {
   citations: Citation[];
   toolCalls: number;
   toolCallDetails?: ToolCallInfo[];
+  activities?: ToolActivity[];
 }
 
 /**
@@ -228,9 +237,10 @@ Be concise and helpful. Focus on answering the user's specific question.`;
       },
     });
 
-    // Extract citations and tool call details from tool calls
+    // Extract citations, tool call details, and activities from tool calls
     const citations: Citation[] = [];
     const toolCallDetails: ToolCallInfo[] = [];
+    const activities: ToolActivity[] = [];
     const toolCalls = result.steps?.length || 0;
 
     if (result.steps) {
@@ -246,6 +256,20 @@ Be concise and helpful. Focus on answering the user's specific question.`;
               args: toolCall.args as Record<string, any>,
               result: toolResult,
             });
+
+            // Generate user-friendly activity messages
+            if (toolCall.toolName === "search_documents") {
+              const query = (toolCall.args as any)?.query || "documents";
+              activities.push({
+                action: "search",
+                details: query,
+              });
+            } else if (toolCall.toolName === "get_document") {
+              activities.push({
+                action: "retrieve",
+                details: "document content",
+              });
+            }
 
             if (toolCall.toolName === "search_documents" && toolResult) {
               const searchResults = toolResult as any;
@@ -334,6 +358,7 @@ Please provide a concise answer and cite the document name in your response.`,
       citations: uniqueCitations,
       toolCalls,
       toolCallDetails,
+      activities,
     };
   } catch (error) {
     console.error("[Chat] Error generating response:", error);
