@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { DragDropOverlay } from "../components/DragDropOverlay";
 import { UploadProgress, type UploadFile } from "../components/UploadProgress";
 import { ProcessingStatus, type ProcessingFile } from "../components/ProcessingStatus";
@@ -745,8 +747,10 @@ Be concise and helpful. Focus on answering the user's specific question based on
                     </div>
                   )}
 
-                  <div className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">
-                    {message.content}
+                  <div className="text-sm text-zinc-700 dark:text-zinc-300 prose prose-sm dark:prose-invert max-w-none [&_p]:my-3 [&_ul]:my-3 [&_ol]:my-3 [&_li]:my-1.5">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {message.content}
+                    </ReactMarkdown>
                   </div>
 
                   {/* Debug: Show raw metadata */}
