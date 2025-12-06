@@ -253,19 +253,20 @@ Be concise and helpful. Focus on answering the user's specific question based on
             const toolCall = step.toolCalls[i];
             const toolResult = step.toolResults[i];
 
+            // Get the input/args from the toolCall - AI SDK v4 uses different structures
+            const toolInput = (toolCall as any).input || toolCall.args;
+
             // Store tool call details for debugging
             toolCallDetails.push({
               toolName: toolCall.toolName,
-              args: toolCall.args as Record<string, any>,
+              args: toolInput as Record<string, any>,
               result: toolResult,
             });
 
             // Generate user-friendly activity messages
             if (toolCall.toolName === "search_documents") {
-              const args = toolCall.args as any;
-              console.log('[Chat] Tool call args:', JSON.stringify(args, null, 2));
-              const query = args?.query || args || "unknown query";
-              console.log('[Chat] Extracted query:', query);
+              const query = toolInput?.query || "unknown query";
+              console.log('[Chat] Extracted search query:', query);
               activities.push({
                 action: "search",
                 details: query,
