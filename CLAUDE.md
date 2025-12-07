@@ -239,6 +239,20 @@ The backend exposes endpoints:
 
 The frontend uses Next.js App Router with Server Components, providing fast development with Turbopack and optimized production builds. All pages have access to Clerk authentication state via the root ClerkProvider.
 
+**trpc/Tanstack Query**:
+
+Use Tanstack Query native API to wrap trpc calls
+
+Example:
+
+```tsx
+useQuery(trpc.chat.getConversations.queryOptions());
+useMutation(trpc.chat.getConversations.mutationOptions());
+await queryClient.invalidateQueries({
+  queryKey: trpc.files.list.queryKey(),
+});
+```
+
 ### Mobile (`apps/mobile`)
 
 **Key architectural components:**
@@ -331,7 +345,7 @@ apps/frontend/app/mockups/
     └── page.tsx
 ```
 
-## Package documentation
+## Library documentation
 
 Always use context7 when I need code generation, setup or configuration steps, or
 library/API documentation. This means you should automatically use the Context7 MCP

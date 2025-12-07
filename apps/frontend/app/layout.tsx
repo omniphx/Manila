@@ -9,7 +9,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { Toaster } from "sonner";
 import "./globals.css";
-import { TRPCProvider } from "./providers/trpc-provider";
+import { QueryProvider } from "./providers/trpc-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -95,7 +95,7 @@ export default function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
-          <TRPCProvider>
+          <QueryProvider>
             <Toaster position="top-right" richColors />
             {/* Header only shown for signed-out users */}
             <SignedOut>
@@ -126,7 +126,7 @@ export default function RootLayout({
               </header>
             </SignedOut>
             {children}
-          </TRPCProvider>
+          </QueryProvider>
         </body>
       </html>
     </ClerkProvider>

@@ -1,40 +1,58 @@
 "use client";
 
+import { useTRPC } from "@/lib/trpc";
 import { SignedIn, SignedOut, useAuth } from "@clerk/nextjs";
-import { trpc } from "@/lib/trpc";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 
 export function FileList() {
   const { getToken } = useAuth();
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const [recentUploadTime, setRecentUploadTime] = useState<number | null>(null);
 
-  const { data: files, isLoading, error } = trpc.files.list.useQuery(
-    { limit: 20, offset: 0 },
-    {
-      // Poll every 3 seconds if:
-      // 1. Any files are processing OR
-      // 2. Less than 30 seconds since last upload (to catch fast processing)
-      refetchInterval: (query) => {
-        const data = query.state.data;
-        if (!data || !Array.isArray(data)) return false;
-
-        const hasProcessing = data.some(
-          (file) => file.processingStatus === 'pending' || file.processingStatus === 'processing'
-        );
-
-        // If there was a recent upload, keep polling for 30 seconds
-        const hasRecentUpload = recentUploadTime && (Date.now() - recentUploadTime < 30000);
-
-        return (hasProcessing || hasRecentUpload) ? 3000 : false;
+  const {
+    data: files,
+    isLoading,
+    error,
+  } = useQuery(
+    trpc.files.list.queryOptions(
+      {
+        limit: 20,
+        offset: 0,
       },
-      // Also refetch when window regains focus
-      refetchOnWindowFocus: true,
-    }
+      {
+        // Poll every 3 seconds if:
+        // 1. Any files are processing OR
+        // 2. Less than 30 seconds since last upload (to catch fast processing)
+        refetchInterval: (query) => {
+          const data = query.state.data;
+          if (!data || !Array.isArray(data)) return false;
+
+          const hasProcessing = data.some(
+            (file) =>
+              file.processingStatus === "pending" ||
+              file.processingStatus === "processing"
+          );
+
+          // If there was a recent upload, keep polling for 30 seconds
+          const hasRecentUpload =
+            recentUploadTime && Date.now() - recentUploadTime < 30000;
+
+          return hasProcessing || hasRecentUpload ? 3000 : false;
+        },
+        refetchOnWindowFocus: true,
+      }
+    )
   );
-  const deleteMutation = trpc.files.delete.useMutation();
-  const utils = trpc.useUtils();
+
+  const deleteMutation = useMutation(trpc.files.delete.mutationOptions());
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [viewingContent, setViewingContent] = useState<{ id: string; filename: string; content: string } | null>(null);
+  const [viewingContent, setViewingContent] = useState<{
+    id: string;
+    filename: string;
+    content: string;
+  } | null>(null);
 
   // Track when new files are detected (indicates recent upload)
   useEffect(() => {
@@ -52,9 +70,15 @@ export function FileList() {
   // Debug logging
   useEffect(() => {
     if (files) {
-      console.log('Files data:', files);
-      files.forEach(file => {
-        console.log(`File: ${file.originalFilename}, Status: ${file.processingStatus}, Has content: ${!!file.extractedContent}, Content length: ${file.extractedContent?.length || 0}`);
+      console.log("Files data:", files);
+      files.forEach((file) => {
+        console.log(
+          `File: ${file.originalFilename}, Status: ${
+            file.processingStatus
+          }, Has content: ${!!file.extractedContent}, Content length: ${
+            file.extractedContent?.length || 0
+          }`
+        );
       });
     }
   }, [files]);
@@ -96,7 +120,9 @@ export function FileList() {
     try {
       await deleteMutation.mutateAsync({ id: fileId });
       // Invalidate the files list query to trigger a refetch
-      await utils.files.list.invalidate();
+      await queryClient.invalidateQueries({
+        queryKey: trpc.files.list.queryKey(),
+      });
     } catch (err) {
       console.error("Delete error:", err);
       alert("Failed to delete file");
@@ -107,25 +133,25 @@ export function FileList() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'pending':
+      case "pending":
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
             Pending
           </span>
         );
-      case 'processing':
+      case "processing":
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
             Processing...
           </span>
         );
-      case 'completed':
+      case "completed":
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
             ✓ Completed
           </span>
         );
-      case 'failed':
+      case "failed":
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400">
             Failed
@@ -153,7 +179,9 @@ export function FileList() {
           </h2>
 
           {isLoading && (
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">Loading files...</p>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              Loading files...
+            </p>
           )}
 
           {error && (
@@ -186,7 +214,8 @@ export function FileList() {
                         {getStatusBadge(file.processingStatus)}
                       </div>
                       <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                        {(parseInt(file.size) / 1024).toFixed(2)} KB • {new Date(file.createdAt).toLocaleDateString()}
+                        {(parseInt(file.size) / 1024).toFixed(2)} KB •{" "}
+                        {new Date(file.createdAt).toLocaleDateString()}
                       </p>
                       {file.processingError && (
                         <p className="text-xs text-red-600 dark:text-red-400 mt-1">
@@ -195,27 +224,34 @@ export function FileList() {
                       )}
                     </div>
                     <div className="flex items-center gap-2 ml-4">
-                      {file.processingStatus === 'completed' && file.extractedContent && (
-                        <button
-                          onClick={() => setViewingContent({
-                            id: file.id,
-                            filename: file.originalFilename,
-                            content: file.extractedContent!
-                          })}
-                          className="text-sm text-[#6c47ff] hover:text-[#5a3ad6] font-medium whitespace-nowrap"
-                        >
-                          View Content
-                        </button>
-                      )}
+                      {file.processingStatus === "completed" &&
+                        file.extractedContent && (
+                          <button
+                            onClick={() =>
+                              setViewingContent({
+                                id: file.id,
+                                filename: file.originalFilename,
+                                content: file.extractedContent!,
+                              })
+                            }
+                            className="text-sm text-[#6c47ff] hover:text-[#5a3ad6] font-medium whitespace-nowrap"
+                          >
+                            View Content
+                          </button>
+                        )}
                       <button
-                        onClick={() => handleDownload(file.id, file.originalFilename)}
+                        onClick={() =>
+                          handleDownload(file.id, file.originalFilename)
+                        }
                         className="text-sm text-[#6c47ff] hover:text-[#5a3ad6] font-medium whitespace-nowrap"
                         disabled={deletingId === file.id}
                       >
                         Download
                       </button>
                       <button
-                        onClick={() => handleDelete(file.id, file.originalFilename)}
+                        onClick={() =>
+                          handleDelete(file.id, file.originalFilename)
+                        }
                         disabled={deletingId === file.id}
                         className="text-sm text-[#6c47ff] hover:text-[#5a3ad6] font-medium disabled:opacity-50 whitespace-nowrap"
                       >
@@ -260,7 +296,7 @@ export function FileList() {
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(viewingContent.content);
-                  alert('Content copied to clipboard!');
+                  alert("Content copied to clipboard!");
                 }}
                 className="bg-[#6c47ff] text-white rounded-full font-medium text-sm h-10 px-5 hover:bg-[#5a3ad6] transition-colors"
               >

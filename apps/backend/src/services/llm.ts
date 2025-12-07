@@ -21,7 +21,7 @@ export async function generateChatResponse(
 ): Promise<string> {
   // Build system message with document context
   let systemMessage =
-    "You are Manila, an AI assistant that helps users understand and analyze their uploaded documents.";
+    "You are FileLlama, an AI assistant that helps users understand and analyze their uploaded documents.";
 
   if (documents.length > 0) {
     systemMessage += "\n\nYou have access to the following documents:\n";

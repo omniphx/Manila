@@ -12,14 +12,8 @@ const searchDocumentsSchema = z.object({
     .describe(
       'Search keywords or phrase. Use full expanded terms instead of acronyms (e.g., "adjusted gross income" not "AGI", "individual retirement account" not "IRA"). Examples: "tax deduction", "2023 income", "adjusted gross income"'
     ),
-  page: z
-    .number()
-    .describe("Page number for pagination")
-    .optional(),
-  pageSize: z
-    .number()
-    .describe("Results per page (max 50)")
-    .optional(),
+  page: z.number().describe("Page number for pagination").optional(),
+  pageSize: z.number().describe("Results per page (max 50)").optional(),
 });
 
 const getDocumentSchema = z.object({
@@ -40,7 +34,6 @@ type GetDocumentInput = z.infer<typeof getDocumentSchema>;
  * Create tool definitions with userId bound
  */
 function createTools(userId: string) {
-
   return {
     search_documents: tool({
       description: `Search through the user's uploaded documents using keywords.
@@ -50,11 +43,7 @@ function createTools(userId: string) {
       IMPORTANT: Always expand acronyms to their full form when searching (e.g., use "adjusted gross income" instead of "AGI").`,
       inputSchema: searchDocumentsSchema,
       execute: async (args) => {
-        const {
-          query,
-          page = 1,
-          pageSize = 10,
-        } = args;
+        const { query, page = 1, pageSize = 10 } = args;
         console.log(`[Tool] search_documents called:`, {
           query,
           page,
@@ -170,7 +159,7 @@ export async function generateChatWithTools(
 ): Promise<ChatResponse> {
   console.log(`[Chat] Processing question for user ${userId}: "${question}"`);
 
-  const systemPrompt = `You are Manila, an AI assistant that helps users find and understand information from their uploaded documents.
+  const systemPrompt = `You are FileLlama, an AI assistant that helps users find and understand information from their uploaded documents.
 
 You have access to two tools:
 1. search_documents - Search for documents using keywords and filters
@@ -241,7 +230,7 @@ Be concise and helpful. Focus on answering the user's specific question based on
             if (toolCall.toolName === "search_documents") {
               const searchInput = toolCall.input as SearchDocumentsInput;
               const query = searchInput.query || "unknown query";
-              console.log('[Chat] Extracted search query:', query);
+              console.log("[Chat] Extracted search query:", query);
               activities.push({
                 action: "search",
                 details: query,
@@ -256,8 +245,15 @@ Be concise and helpful. Focus on answering the user's specific question based on
             if (toolCall.toolName === "search_documents" && toolResult) {
               const searchResults = toolResult as any;
               // Handle different response structures from AI SDK
-              const results = searchResults.output?.results || searchResults.results || searchResults.value?.results;
-              console.log('[Chat] Found', results?.length || 0, 'search results');
+              const results =
+                searchResults.output?.results ||
+                searchResults.results ||
+                searchResults.value?.results;
+              console.log(
+                "[Chat] Found",
+                results?.length || 0,
+                "search results"
+              );
               if (results && Array.isArray(results)) {
                 for (const doc of results) {
                   citations.push({
@@ -267,10 +263,7 @@ Be concise and helpful. Focus on answering the user's specific question based on
                   });
                 }
               }
-            } else if (
-              toolCall.toolName === "get_document" &&
-              toolResult
-            ) {
+            } else if (toolCall.toolName === "get_document" && toolResult) {
               const docResult = toolResult as any;
               // Handle different response structures from AI SDK
               const result = docResult.output || docResult.value || docResult;
@@ -303,14 +296,16 @@ Be concise and helpful. Focus on answering the user's specific question based on
     if (!answer && toolCalls > 0 && uniqueCitations.length > 0) {
       // If we have citations but no answer, the LLM stopped after the first tool call
       // Call get_document to retrieve the full content and try again
-      console.log('[Chat] No final answer generated, retrieving full document content...');
+      console.log(
+        "[Chat] No final answer generated, retrieving full document content..."
+      );
 
       const documentId = uniqueCitations[0].documentId;
       const document = await getDocument(userId, documentId);
 
       if (document && document.content) {
         // Make another call to the LLM with the document content
-        console.log('[Chat] Generating answer with document content...');
+        console.log("[Chat] Generating answer with document content...");
         const finalResult = await generateText({
           model: openai.chat("gpt-4o"),
           prompt: `Based on the following document, answer this question: "${question}"
@@ -327,10 +322,12 @@ Please provide a concise answer and cite the document name in your response.`,
 
       // Fallback if we still don't have an answer
       if (!answer) {
-        answer = "I found relevant documents but encountered an issue generating a response. Please try asking your question again.";
+        answer =
+          "I found relevant documents but encountered an issue generating a response. Please try asking your question again.";
       }
     } else if (!answer && toolCalls > 0) {
-      answer = "I searched through your documents but couldn't find any information related to your question. Please make sure you've uploaded the relevant documents.";
+      answer =
+        "I searched through your documents but couldn't find any information related to your question. Please make sure you've uploaded the relevant documents.";
     }
 
     return {
