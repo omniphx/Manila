@@ -2,6 +2,7 @@ import { generateText, tool } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import { searchDocuments, getDocument } from "./full-text-search.js";
+import { FILELAMA_SYSTEM_PROMPT } from "../constants/prompts.js";
 
 /**
  * Zod schemas for tool inputs
@@ -10,7 +11,7 @@ const searchDocumentsSchema = z.object({
   query: z
     .string()
     .describe(
-      'Search keywords or phrase. Use full expanded terms instead of acronyms (e.g., "adjusted gross income" not "AGI", "individual retirement account" not "IRA"). Examples: "tax deduction", "2023 income", "adjusted gross income"'
+      'Search keywords or phrase. Use full expanded terms instead of acronyms (e.g., "adjusted gross income" not "AGI", "individual retirement account" not "IRA"). Examples: "tax deduction", "2023 income", "adjusted gross income"',
     ),
   page: z.number().describe("Page number for pagination").optional(),
   pageSize: z.number().describe("Results per page (max 50)").optional(),
@@ -54,7 +55,7 @@ function createTools(userId: string) {
           query,
           {},
           page,
-          pageSize
+          pageSize,
         );
 
         // Format results for LLM
@@ -155,31 +156,9 @@ export async function generateChatWithTools(
   conversationHistory: Array<{
     role: "user" | "assistant";
     content: string;
-  }> = []
+  }> = [],
 ): Promise<ChatResponse> {
   console.log(`[Chat] Processing question for user ${userId}: "${question}"`);
-
-  const systemPrompt = `You are FileLlama, an AI assistant that helps users find and understand information from their uploaded documents.
-
-You have access to two tools:
-1. search_documents - Search for documents using keywords and filters
-2. get_document - Retrieve full content of a specific document
-
-CRITICAL RULES - You MUST follow these:
-1. ALWAYS use search_documents for EVERY question - this is mandatory, not optional
-2. You MUST NOT answer questions without searching the user's documents first
-3. Generate multiple search queries with different keyword combinations to maximize document discovery:
-   - Create 3-5 different search queries from the user's question
-   - Use different permutations of keywords (concise, 2-4 words each)
-   - Try synonyms, related terms, and different phrasings
-   - Example: For "AI impact on traffic" try: "AI traffic", "artificial intelligence traffic", "AI organic search", "traffic decline AI", "search algorithm changes"
-4. Execute ALL search queries you generate - call search_documents multiple times with different queries
-5. After searching, if needed, use get_document to retrieve full content of promising documents
-6. Base your answers ONLY on information found in the user's documents
-7. Always cite your sources using the format: [filename]
-8. If no relevant documents are found after all searches, tell the user you couldn't find information in their documents
-
-Be concise and helpful. Focus on answering the user's specific question based on their documents.`;
 
   try {
     // Create tools with userId bound
@@ -187,7 +166,7 @@ Be concise and helpful. Focus on answering the user's specific question based on
 
     const result = await generateText({
       model: openai.chat("gpt-4o"),
-      system: systemPrompt,
+      system: FILELAMA_SYSTEM_PROMPT,
       messages: [
         ...conversationHistory.map((msg) => ({
           role: msg.role,
@@ -252,7 +231,7 @@ Be concise and helpful. Focus on answering the user's specific question based on
               console.log(
                 "[Chat] Found",
                 results?.length || 0,
-                "search results"
+                "search results",
               );
               if (results && Array.isArray(results)) {
                 for (const doc of results) {
@@ -281,11 +260,11 @@ Be concise and helpful. Focus on answering the user's specific question based on
 
     // Deduplicate citations by documentId
     const uniqueCitations = Array.from(
-      new Map(citations.map((c) => [c.documentId, c])).values()
+      new Map(citations.map((c) => [c.documentId, c])).values(),
     );
 
     console.log(
-      `[Chat] Generated response with ${toolCalls} tool calls and ${uniqueCitations.length} citations`
+      `[Chat] Generated response with ${toolCalls} tool calls and ${uniqueCitations.length} citations`,
     );
     console.log(`[Chat] Result text length: ${result.text.length}`);
     console.log(`[Chat] Result text: ${result.text}`);
@@ -297,7 +276,7 @@ Be concise and helpful. Focus on answering the user's specific question based on
       // If we have citations but no answer, the LLM stopped after the first tool call
       // Call get_document to retrieve the full content and try again
       console.log(
-        "[Chat] No final answer generated, retrieving full document content..."
+        "[Chat] No final answer generated, retrieving full document content...",
       );
 
       const documentId = uniqueCitations[0].documentId;

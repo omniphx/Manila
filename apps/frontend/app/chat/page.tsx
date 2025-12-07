@@ -754,68 +754,6 @@ export default function ChatPage() {
 
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
-          {/* System Prompt - Only shown in debug mode */}
-          {debugMode && isDevelopment && messages.length > 0 && (
-            <div className="flex gap-4 opacity-75">
-              {/* System Icon */}
-              <div className="w-8 h-8 rounded-full bg-zinc-300 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 flex-shrink-0 flex items-center justify-center text-sm font-medium">
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                  />
-                </svg>
-              </div>
-
-              {/* System Message Content */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                    System
-                  </span>
-                  <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                    DEBUG MODE
-                  </span>
-                </div>
-                <div className="text-xs text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-3 font-mono whitespace-pre-wrap border border-zinc-200 dark:border-zinc-700">
-                  {`You are FileLlama, an AI assistant that helps users find and understand information from their uploaded documents.
-
-You have access to two tools:
-1. search_documents - Search for documents using keywords and filters
-2. get_document - Retrieve full content of a specific document
-
-CRITICAL RULES - You MUST follow these:
-1. ALWAYS use search_documents for EVERY question - this is mandatory, not optional
-2. You MUST NOT answer questions without searching the user's documents first
-3. Generate multiple search queries with different keyword combinations to maximize document discovery:
-   - Create 3-5 different search queries from the user's question
-   - Use different permutations of keywords (concise, 2-4 words each)
-   - Try synonyms, related terms, and different phrasings
-   - Example: For "AI impact on traffic" try: "AI traffic", "artificial intelligence traffic", "AI organic search", "traffic decline AI", "search algorithm changes"
-4. Execute ALL search queries you generate - call search_documents multiple times with different queries
-5. After searching, if needed, use get_document to retrieve full content of promising documents
-6. Base your answers ONLY on information found in the user's documents
-7. Always cite your sources using the format: [filename]
-8. If no relevant documents are found after all searches, tell the user you couldn't find information in their documents
-
-Be concise and helpful. Focus on answering the user's specific question based on their documents.`}
-                </div>
-              </div>
-            </div>
-          )}
-
           {messages.map((message) => {
             const metadata = message.metadata
               ? JSON.parse(message.metadata)
@@ -824,9 +762,19 @@ Be concise and helpful. Focus on answering the user's specific question based on
             const citations = metadata?.citations || [];
             const toolCallDetails = metadata?.toolCallDetails || [];
             const activities = metadata?.activities || [];
+            const isSystemMessage = metadata?.isSystemMessage || false;
+            const isDebugMessage = metadata?.isDebugMessage || false;
+
+            // Hide system messages unless in debug mode
+            if (isSystemMessage && (!debugMode || !isDevelopment)) {
+              return null;
+            }
 
             return (
-              <div key={message.id} className="flex gap-4">
+              <div
+                key={message.id}
+                className={`flex gap-4 ${isSystemMessage ? "opacity-75" : ""}`}
+              >
                 {/* Avatar */}
                 {message.role === "user" ? (
                   userImageUrl ? (
@@ -840,6 +788,27 @@ Be concise and helpful. Focus on answering the user's specific question based on
                       {userInitials}
                     </div>
                   )
+                ) : message.role === "system" ? (
+                  <div className="w-8 h-8 rounded-full bg-zinc-300 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 flex-shrink-0 flex items-center justify-center text-sm font-medium">
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                    </svg>
+                  </div>
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-[#6c47ff] text-white flex-shrink-0 flex items-center justify-center text-sm font-medium">
                     FL
@@ -850,8 +819,17 @@ Be concise and helpful. Focus on answering the user's specific question based on
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      {message.role === "user" ? "You" : "FileLlama"}
+                      {message.role === "user"
+                        ? "You"
+                        : message.role === "system"
+                          ? "System"
+                          : "FileLlama"}
                     </span>
+                    {isDebugMessage && (
+                      <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                        DEBUG MODE
+                      </span>
+                    )}
                     <span className="text-xs text-zinc-400 dark:text-zinc-500">
                       {formatTime(message.createdAt)}
                     </span>
@@ -968,11 +946,17 @@ Be concise and helpful. Focus on answering the user's specific question based on
                       </div>
                     )}
 
-                  <div className="text-sm text-zinc-700 dark:text-zinc-300 prose prose-sm dark:prose-invert max-w-none [&_p]:my-3 [&_ul]:my-3 [&_ol]:my-3 [&_li]:my-1.5">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {message.role === "system" ? (
+                    <div className="text-xs text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-3 font-mono whitespace-pre-wrap border border-zinc-200 dark:border-zinc-700">
                       {message.content}
-                    </ReactMarkdown>
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-zinc-700 dark:text-zinc-300 prose prose-sm dark:prose-invert max-w-none [&_p]:my-3 [&_ul]:my-3 [&_ol]:my-3 [&_li]:my-1.5">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
+                  )}
 
                   {/* Debug: Show raw metadata */}
                   {debugMode && isDevelopment && message.metadata && (

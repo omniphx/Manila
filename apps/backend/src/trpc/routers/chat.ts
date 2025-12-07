@@ -1,11 +1,12 @@
-import { z } from 'zod';
-import { TRPCError } from '@trpc/server';
-import { router, protectedProcedure } from '../trpc.js';
-import { conversations, messages } from '../../db/schema.js';
-import { eq, desc } from 'drizzle-orm';
-import { generateChatWithTools } from '../../services/chat-with-tools.js';
-import { generateText } from 'ai';
-import { openai } from '@ai-sdk/openai';
+import { z } from "zod";
+import { TRPCError } from "@trpc/server";
+import { router, protectedProcedure } from "../trpc.js";
+import { conversations, messages } from "../../db/schema.js";
+import { eq, desc } from "drizzle-orm";
+import { generateChatWithTools } from "../../services/chat-with-tools.js";
+import { generateText } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { FILELAMA_SYSTEM_PROMPT } from "../../constants/prompts.js";
 
 /**
  * Generate a concise conversation title from the first user message
@@ -13,7 +14,7 @@ import { openai } from '@ai-sdk/openai';
 async function generateConversationTitle(userMessage: string): Promise<string> {
   try {
     const result = await generateText({
-      model: openai.chat('gpt-4o'),
+      model: openai.chat("gpt-4o"),
       prompt: `Generate a very concise title (3-5 words maximum) for a conversation that starts with this user message:
 
 "${userMessage}"
@@ -21,10 +22,10 @@ async function generateConversationTitle(userMessage: string): Promise<string> {
 Return ONLY the title, nothing else. Do not use quotes.`,
     });
 
-    return result.text.trim() || 'New Conversation';
+    return result.text.trim() || "New Conversation";
   } catch (error) {
-    console.error('[Chat] Error generating title:', error);
-    return 'New Conversation';
+    console.error("[Chat] Error generating title:", error);
+    return "New Conversation";
   }
 }
 
@@ -66,8 +67,8 @@ export const chatRouter = router({
 
       if (!conversation || conversation.userId !== ctx.user.userId) {
         throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Conversation not found',
+          code: "NOT_FOUND",
+          message: "Conversation not found",
         });
       }
 
@@ -92,8 +93,8 @@ export const chatRouter = router({
 
       if (!conversation || conversation.userId !== ctx.user.userId) {
         throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Conversation not found',
+          code: "NOT_FOUND",
+          message: "Conversation not found",
         });
       }
 
@@ -110,7 +111,7 @@ export const chatRouter = router({
       z.object({
         conversationId: z.string().uuid(),
         content: z.string().min(1).max(10000),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       // Verify the conversation belongs to the user
@@ -122,8 +123,27 @@ export const chatRouter = router({
 
       if (!conversation || conversation.userId !== ctx.user.userId) {
         throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Conversation not found',
+          code: "NOT_FOUND",
+          message: "Conversation not found",
+        });
+      }
+
+      // Check if this is the first message in the conversation
+      const existingMessages = await ctx.db
+        .select()
+        .from(messages)
+        .where(eq(messages.conversationId, input.conversationId));
+
+      // If this is the first message, insert the system prompt as a debug message
+      if (existingMessages.length === 0) {
+        await ctx.db.insert(messages).values({
+          conversationId: input.conversationId,
+          role: "system",
+          content: FILELAMA_SYSTEM_PROMPT,
+          metadata: JSON.stringify({
+            isSystemMessage: true,
+            isDebugMessage: true,
+          }),
         });
       }
 
@@ -132,7 +152,7 @@ export const chatRouter = router({
         .insert(messages)
         .values({
           conversationId: input.conversationId,
-          role: 'user',
+          role: "user",
           content: input.content,
         })
         .returning();
@@ -145,12 +165,13 @@ export const chatRouter = router({
         .orderBy(desc(messages.createdAt))
         .limit(10);
 
-      // Reverse to chronological order and exclude the just-added message
+      // Reverse to chronological order, exclude the just-added message, and filter out system messages
       const historyForLLM = conversationHistory
         .reverse()
         .slice(0, -1)
+        .filter((msg) => msg.role !== "system")
         .map((msg) => ({
-          role: msg.role as 'user' | 'assistant',
+          role: msg.role as "user" | "assistant",
           content: msg.content,
         }));
 
@@ -158,7 +179,7 @@ export const chatRouter = router({
       const chatResult = await generateChatWithTools(
         ctx.user.userId,
         input.content,
-        historyForLLM
+        historyForLLM,
       );
 
       // Save AI response with citations, tool call details, and activities
@@ -166,7 +187,7 @@ export const chatRouter = router({
         .insert(messages)
         .values({
           conversationId: input.conversationId,
-          role: 'assistant',
+          role: "assistant",
           content: chatResult.answer,
           metadata: JSON.stringify({
             citations: chatResult.citations,
@@ -183,9 +204,12 @@ export const chatRouter = router({
         .from(messages)
         .where(eq(messages.conversationId, input.conversationId));
 
-      const userMessages = allMessages.filter(m => m.role === 'user');
+      const userMessages = allMessages.filter((m) => m.role === "user");
 
-      if (userMessages.length === 1 && (conversation.title === 'New Conversation' || !conversation.title)) {
+      if (
+        userMessages.length === 1 &&
+        (conversation.title === "New Conversation" || !conversation.title)
+      ) {
         // Generate a title from the first user message
         const generatedTitle = await generateConversationTitle(input.content);
 
@@ -193,7 +217,7 @@ export const chatRouter = router({
           .update(conversations)
           .set({
             title: generatedTitle,
-            updatedAt: new Date()
+            updatedAt: new Date(),
           })
           .where(eq(conversations.id, input.conversationId));
       } else {
