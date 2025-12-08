@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -245,6 +245,302 @@ function TypingIndicator() {
   );
 }
 
+// File viewer modal component
+function FileViewerModal({
+  documentId,
+  onClose,
+}: {
+  documentId: string;
+  onClose: () => void;
+}) {
+  const [viewMode, setViewMode] = useState<"extracted" | "original">(
+    "extracted"
+  );
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [isLoadingFile, setIsLoadingFile] = useState(false);
+  const trpc = useTRPC();
+  const { getToken } = useAuth();
+  const {
+    data: document,
+    isLoading,
+    error,
+  } = useQuery(
+    trpc.files.getById.queryOptions({ id: documentId, includeContent: true })
+  );
+
+  // Fetch the file when switching to original view
+  useEffect(() => {
+    if (viewMode === "original" && document && !fileUrl && !isLoadingFile) {
+      setIsLoadingFile(true);
+      const apiBaseUrl = (
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/trpc"
+      ).replace(/\/trpc$/, "");
+
+      // Get Clerk session token and fetch the file
+      (async () => {
+        try {
+          // Get the session token from Clerk
+          const token = await getToken();
+
+          const response = await fetch(`${apiBaseUrl}/files/${documentId}`, {
+            headers: token
+              ? {
+                  Authorization: `Bearer ${token}`,
+                }
+              : {},
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to load file: ${response.statusText}`);
+          }
+
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          setFileUrl(url);
+          setFileError(null);
+        } catch (err) {
+          console.error("Failed to fetch file:", err);
+          setFileError(
+            err instanceof Error ? err.message : "Failed to load file"
+          );
+        } finally {
+          setIsLoadingFile(false);
+        }
+      })();
+    }
+  }, [viewMode, document, documentId, fileUrl, isLoadingFile, getToken]);
+
+  // Cleanup blob URL only when modal closes (component unmounts)
+  useEffect(() => {
+    return () => {
+      if (fileUrl) {
+        URL.revokeObjectURL(fileUrl);
+      }
+    };
+  }, [fileUrl]);
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl max-w-4xl w-full h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <FileIcon className="w-5 h-5 text-zinc-400 flex-shrink-0" />
+              <div className="min-w-0 flex-1">
+                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+                  {document?.originalFilename || "Loading..."}
+                </h2>
+                {document && (
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    {document.mimeType} •{" "}
+                    {(parseInt(document.size) / 1024).toFixed(1)} KB
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 flex-shrink-0"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+
+          {/* View mode toggle */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setViewMode("extracted")}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                viewMode === "extracted"
+                  ? "bg-[#6c47ff] text-white"
+                  : "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+              }`}
+            >
+              Extracted Text
+            </button>
+            <button
+              onClick={() => setViewMode("original")}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                viewMode === "original"
+                  ? "bg-[#6c47ff] text-white"
+                  : "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+              }`}
+            >
+              Original Document
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-hidden">
+          {isLoading && (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <div className="w-8 h-8 border-4 border-[#6c47ff] border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                  Loading document...
+                </p>
+              </div>
+            </div>
+          )}
+          {error && (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  Failed to load document
+                </p>
+              </div>
+            </div>
+          )}
+          {document && (
+            <>
+              {/* Extracted Text View */}
+              {viewMode === "extracted" && (
+                <div className="h-full overflow-y-auto p-6 min-h-0">
+                  {document.extractedContent ? (
+                    <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-lg p-4 border border-zinc-200 dark:border-zinc-700">
+                      <div className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap font-mono">
+                        {document.extractedContent}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                        This document has not been processed yet or contains no
+                        extractable text.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Original Document View */}
+              {viewMode === "original" && (
+                <div className="h-full min-h-0">
+                  {isLoadingFile ? (
+                    <div className="h-full flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="w-8 h-8 border-4 border-[#6c47ff] border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                          Loading file...
+                        </p>
+                      </div>
+                    </div>
+                  ) : fileError ? (
+                    <div className="h-full flex items-center justify-center p-6">
+                      <div className="text-center space-y-4">
+                        <p className="text-sm text-red-600 dark:text-red-400">
+                          {fileError}
+                        </p>
+                        <button
+                          onClick={() => {
+                            setFileError(null);
+                            setFileUrl(null);
+                            setIsLoadingFile(false);
+                          }}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-[#6c47ff] text-white rounded-lg hover:bg-[#5a3ad6] transition-colors"
+                        >
+                          Try Again
+                        </button>
+                      </div>
+                    </div>
+                  ) : fileUrl ? (
+                    <>
+                      {document.mimeType === "application/pdf" ? (
+                        <div className="h-full w-full">
+                          <iframe
+                            src={fileUrl}
+                            className="w-full h-full border-0 min-h-0"
+                            title={document.originalFilename}
+                          />
+                        </div>
+                      ) : document.mimeType.startsWith("image/") ? (
+                        <div className="h-full overflow-y-auto p-6 flex items-start justify-center bg-zinc-50 dark:bg-zinc-900 min-h-0">
+                          <img
+                            src={fileUrl}
+                            alt={document.originalFilename}
+                            className="max-w-full h-auto rounded-lg shadow-lg"
+                          />
+                        </div>
+                      ) : document.mimeType === "text/plain" ? (
+                        <div className="h-full w-full">
+                          <iframe
+                            src={fileUrl}
+                            className="w-full h-full border-0 bg-white dark:bg-zinc-900 min-h-0"
+                            title={document.originalFilename}
+                          />
+                        </div>
+                      ) : (
+                        <div className="h-full flex items-center justify-center p-6">
+                          <div className="text-center space-y-4">
+                            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                              Preview not available for this file type.
+                            </p>
+                            <a
+                              href={fileUrl}
+                              download={document.originalFilename}
+                              className="inline-flex items-center gap-2 px-4 py-2 bg-[#6c47ff] text-white rounded-lg hover:bg-[#5a3ad6] transition-colors"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                                />
+                              </svg>
+                              Download File
+                            </a>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : null}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [inputValue, setInputValue] = useState("");
@@ -254,6 +550,9 @@ export default function ChatPage() {
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [debugMode, setDebugMode] = useState(false);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
+    null
+  );
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useUser();
   const trpc = useTRPC();
@@ -524,524 +823,528 @@ export default function ChatPage() {
   };
 
   return (
-    <DragDropOverlay
-      onFilesDropped={handleFilesDropped}
-      className="flex h-screen bg-white dark:bg-zinc-950 overflow-hidden"
-    >
-      {/* Sidebar */}
-      <div
-        className={`${
-          sidebarOpen ? "w-64" : "w-14"
-        } flex-shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 transition-all duration-200 flex flex-col`}
+    <>
+      {/* File Viewer Modal */}
+      {selectedDocumentId && (
+        <FileViewerModal
+          documentId={selectedDocumentId}
+          onClose={() => setSelectedDocumentId(null)}
+        />
+      )}
+
+      <DragDropOverlay
+        onFilesDropped={handleFilesDropped}
+        className="flex h-screen bg-white dark:bg-zinc-950 overflow-hidden"
       >
-        {/* Sidebar Header */}
-        <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-          {sidebarOpen && (
-            <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-              FileLlama
-            </span>
-          )}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-1.5 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
-          >
-            {sidebarOpen ? (
-              <ChevronLeftIcon className="w-4 h-4" />
-            ) : (
-              <MenuIcon className="w-4 h-4" />
-            )}
-          </button>
-        </div>
-
-        {/* New Chat Button */}
-        <div className="p-2 border-b border-zinc-200 dark:border-zinc-800">
-          <button
-            onClick={() => {
-              createConversation.mutate(
-                { title: "New Conversation" },
-                {
-                  onSuccess: (data) => {
-                    setConversationId(data.id);
-                  },
-                }
-              );
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-md transition-colors bg-[#6c47ff] text-white hover:bg-[#5a3ad6] cursor-pointer"
-          >
-            <svg
-              className="w-4 h-4 flex-shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 4.5v15m7.5-7.5h-15"
-              />
-            </svg>
+        {/* Sidebar */}
+        <div
+          className={`${
+            sidebarOpen ? "w-64" : "w-14"
+          } flex-shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 transition-all duration-200 flex flex-col`}
+        >
+          {/* Sidebar Header */}
+          <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
             {sidebarOpen && (
-              <span className="text-sm font-medium">New Chat</span>
+              <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                FileLlama
+              </span>
             )}
-          </button>
-        </div>
-
-        {/* View Toggle */}
-        <div className="p-2 border-b border-zinc-200 dark:border-zinc-800">
-          <div className="flex flex-col gap-1">
-            <button className="flex items-center gap-2 px-2 py-2 rounded-md transition-colors bg-[#6c47ff]/10 text-[#6c47ff]">
-              <ChatIcon className="w-5 h-5 flex-shrink-0" />
-              {sidebarOpen && <span className="text-sm font-medium">Chat</span>}
-            </button>
-            <Link
-              href="/files"
-              className="flex items-center gap-2 px-2 py-2 rounded-md transition-colors text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800"
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-1.5 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
             >
-              <FolderIcon className="w-5 h-5 flex-shrink-0" />
+              {sidebarOpen ? (
+                <ChevronLeftIcon className="w-4 h-4" />
+              ) : (
+                <MenuIcon className="w-4 h-4" />
+              )}
+            </button>
+          </div>
+
+          {/* New Chat Button */}
+          <div className="p-2 border-b border-zinc-200 dark:border-zinc-800">
+            <button
+              onClick={() => {
+                createConversation.mutate(
+                  { title: "New Conversation" },
+                  {
+                    onSuccess: (data) => {
+                      setConversationId(data.id);
+                    },
+                  }
+                );
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-md transition-colors bg-[#6c47ff] text-white hover:bg-[#5a3ad6] cursor-pointer"
+            >
+              <svg
+                className="w-4 h-4 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 4.5v15m7.5-7.5h-15"
+                />
+              </svg>
               {sidebarOpen && (
-                <span className="text-sm font-medium">Files</span>
+                <span className="text-sm font-medium">New Chat</span>
+              )}
+            </button>
+          </div>
+
+          {/* View Toggle */}
+          <div className="p-2 border-b border-zinc-200 dark:border-zinc-800">
+            <div className="flex flex-col gap-1">
+              <button className="flex items-center gap-2 px-2 py-2 rounded-md transition-colors bg-[#6c47ff]/10 text-[#6c47ff]">
+                <ChatIcon className="w-5 h-5 flex-shrink-0" />
+                {sidebarOpen && (
+                  <span className="text-sm font-medium">Chat</span>
+                )}
+              </button>
+              <Link
+                href="/files"
+                className="flex items-center gap-2 px-2 py-2 rounded-md transition-colors text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800"
+              >
+                <FolderIcon className="w-5 h-5 flex-shrink-0" />
+                {sidebarOpen && (
+                  <span className="text-sm font-medium">Files</span>
+                )}
+              </Link>
+            </div>
+          </div>
+
+          {/* Recent Conversations (when sidebar is open) */}
+          {sidebarOpen && (
+            <div className="flex-1 overflow-y-auto p-3">
+              <h3 className="text-xs font-semibold text-zinc-500 dark:text-zinc-500 uppercase tracking-wider mb-2">
+                Recent Conversations
+              </h3>
+              <div className="space-y-1">
+                {conversations.map((conv) => (
+                  <div
+                    key={conv.id}
+                    className={`w-full flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors group ${
+                      conv.id === conversationId
+                        ? "bg-zinc-200 dark:bg-zinc-800"
+                        : ""
+                    }`}
+                  >
+                    <button
+                      onClick={() => setConversationId(conv.id)}
+                      className="flex-1 flex items-center gap-2 text-left min-w-0 cursor-pointer"
+                    >
+                      <ChatIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+                      <span className="text-sm text-zinc-700 dark:text-zinc-300 truncate">
+                        {conv.title || "New Conversation"}
+                      </span>
+                    </button>
+                    <button
+                      onClick={(e) => handleDeleteConversation(conv.id, e)}
+                      className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-all flex-shrink-0 cursor-pointer"
+                      title="Delete conversation"
+                    >
+                      <TrashIcon className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Collapsed state - just show chat icons */}
+          {!sidebarOpen && (
+            <div className="flex-1 overflow-y-auto p-2">
+              <div className="space-y-1">
+                {conversations.slice(0, 5).map((conv) => (
+                  <button
+                    key={conv.id}
+                    onClick={() => setConversationId(conv.id)}
+                    className={`w-full flex items-center justify-center p-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors cursor-pointer ${
+                      conv.id === conversationId
+                        ? "bg-zinc-200 dark:bg-zinc-800"
+                        : ""
+                    }`}
+                    title={conv.title || "New Conversation"}
+                  >
+                    <ChatIcon className="w-4 h-4 text-zinc-400" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* User Profile Badge */}
+          <div className="border-t border-zinc-200 dark:border-zinc-800 p-2">
+            <Link
+              href="/account"
+              className={`w-full flex items-center gap-3 p-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors ${
+                sidebarOpen ? "" : "justify-center"
+              }`}
+            >
+              {/* Avatar */}
+              {userImageUrl ? (
+                <img
+                  src={userImageUrl}
+                  alt={userName}
+                  className="w-8 h-8 rounded-full flex-shrink-0 object-cover"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-[#6c47ff] flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                  {userInitials}
+                </div>
+              )}
+              {sidebarOpen && (
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
+                    {userName}
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                    {userEmail}
+                  </p>
+                </div>
+              )}
+              {sidebarOpen && (
+                <SettingsIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" />
               )}
             </Link>
           </div>
         </div>
 
-        {/* Recent Conversations (when sidebar is open) */}
-        {sidebarOpen && (
-          <div className="flex-1 overflow-y-auto p-3">
-            <h3 className="text-xs font-semibold text-zinc-500 dark:text-zinc-500 uppercase tracking-wider mb-2">
-              Recent Conversations
-            </h3>
-            <div className="space-y-1">
-              {conversations.map((conv) => (
-                <div
-                  key={conv.id}
-                  className={`w-full flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors group ${
-                    conv.id === conversationId
-                      ? "bg-zinc-200 dark:bg-zinc-800"
-                      : ""
-                  }`}
-                >
-                  <button
-                    onClick={() => setConversationId(conv.id)}
-                    className="flex-1 flex items-center gap-2 text-left min-w-0 cursor-pointer"
-                  >
-                    <ChatIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" />
-                    <span className="text-sm text-zinc-700 dark:text-zinc-300 truncate">
-                      {conv.title || "New Conversation"}
-                    </span>
-                  </button>
-                  <button
-                    onClick={(e) => handleDeleteConversation(conv.id, e)}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-all flex-shrink-0 cursor-pointer"
-                    title="Delete conversation"
-                  >
-                    <TrashIcon className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
-                  </button>
-                </div>
-              ))}
+        {/* Main Chat Area */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Chat Header */}
+          <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+            <div>
+              <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                Document Chat
+              </h1>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                Ask questions about your uploaded documents
+              </p>
             </div>
-          </div>
-        )}
-
-        {/* Collapsed state - just show chat icons */}
-        {!sidebarOpen && (
-          <div className="flex-1 overflow-y-auto p-2">
-            <div className="space-y-1">
-              {conversations.slice(0, 5).map((conv) => (
+            <div className="flex items-center gap-4">
+              {/* Debug Toggle - Only visible in development */}
+              {isDevelopment && (
                 <button
-                  key={conv.id}
-                  onClick={() => setConversationId(conv.id)}
-                  className={`w-full flex items-center justify-center p-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors cursor-pointer ${
-                    conv.id === conversationId
-                      ? "bg-zinc-200 dark:bg-zinc-800"
-                      : ""
+                  onClick={() => setDebugMode(!debugMode)}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    debugMode
+                      ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700"
+                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700"
                   }`}
-                  title={conv.title || "New Conversation"}
+                  title="Toggle debug mode to view system prompts"
                 >
-                  <ChatIcon className="w-4 h-4 text-zinc-400" />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* User Profile Badge */}
-        <div className="border-t border-zinc-200 dark:border-zinc-800 p-2">
-          <Link
-            href="/account"
-            className={`w-full flex items-center gap-3 p-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors ${
-              sidebarOpen ? "" : "justify-center"
-            }`}
-          >
-            {/* Avatar */}
-            {userImageUrl ? (
-              <img
-                src={userImageUrl}
-                alt={userName}
-                className="w-8 h-8 rounded-full flex-shrink-0 object-cover"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-[#6c47ff] flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
-                {userInitials}
-              </div>
-            )}
-            {sidebarOpen && (
-              <div className="flex-1 min-w-0 text-left">
-                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
-                  {userName}
-                </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
-                  {userEmail}
-                </p>
-              </div>
-            )}
-            {sidebarOpen && (
-              <SettingsIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" />
-            )}
-          </Link>
-        </div>
-      </div>
-
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Chat Header */}
-        <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              Document Chat
-            </h1>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Ask questions about your uploaded documents
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            {/* Debug Toggle - Only visible in development */}
-            {isDevelopment && (
-              <button
-                onClick={() => setDebugMode(!debugMode)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  debugMode
-                    ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700"
-                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700"
-                }`}
-                title="Toggle debug mode to view system prompts"
-              >
-                <svg
-                  className="w-3.5 h-3.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"
-                  />
-                </svg>
-                Debug {debugMode ? "ON" : "OFF"}
-              </button>
-            )}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                {mockRecentFiles.length} files indexed
-              </span>
-              <span className="w-2 h-2 rounded-full bg-green-500"></span>
-            </div>
-          </div>
-        </div>
-
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
-          {messages.map((message) => {
-            const metadata = message.metadata
-              ? JSON.parse(message.metadata)
-              : null;
-            console.log("metadata", metadata);
-            const citations = metadata?.citations || [];
-            const toolCallDetails = metadata?.toolCallDetails || [];
-            const activities = metadata?.activities || [];
-            const isSystemMessage = metadata?.isSystemMessage || false;
-            const isDebugMessage = metadata?.isDebugMessage || false;
-
-            // Hide system messages unless in debug mode
-            if (isSystemMessage && (!debugMode || !isDevelopment)) {
-              return null;
-            }
-
-            return (
-              <div
-                key={message.id}
-                className={`flex gap-4 ${isSystemMessage ? "opacity-75" : ""}`}
-              >
-                {/* Avatar */}
-                {message.role === "user" ? (
-                  userImageUrl ? (
-                    <img
-                      src={userImageUrl}
-                      alt={userName}
-                      className="w-8 h-8 rounded-full flex-shrink-0 object-cover"
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"
                     />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 flex-shrink-0 flex items-center justify-center text-sm font-medium">
-                      {userInitials}
+                  </svg>
+                  Debug {debugMode ? "ON" : "OFF"}
+                </button>
+              )}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {mockRecentFiles.length} files indexed
+                </span>
+                <span className="w-2 h-2 rounded-full bg-green-500"></span>
+              </div>
+            </div>
+          </div>
+
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+            {messages.map((message) => {
+              const metadata = message.metadata
+                ? JSON.parse(message.metadata)
+                : null;
+              console.log("metadata", metadata);
+              const citations = metadata?.citations || [];
+              const toolCallDetails = metadata?.toolCallDetails || [];
+              const activities = metadata?.activities || [];
+              const isSystemMessage = metadata?.isSystemMessage || false;
+              const isDebugMessage = metadata?.isDebugMessage || false;
+
+              // Hide system messages unless in debug mode
+              if (isSystemMessage && (!debugMode || !isDevelopment)) {
+                return null;
+              }
+
+              return (
+                <div
+                  key={message.id}
+                  className={`flex gap-4 ${
+                    isSystemMessage ? "opacity-75" : ""
+                  }`}
+                >
+                  {/* Avatar */}
+                  {message.role === "user" ? (
+                    userImageUrl ? (
+                      <img
+                        src={userImageUrl}
+                        alt={userName}
+                        className="w-8 h-8 rounded-full flex-shrink-0 object-cover"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 flex-shrink-0 flex items-center justify-center text-sm font-medium">
+                        {userInitials}
+                      </div>
+                    )
+                  ) : message.role === "system" ? (
+                    <div className="w-8 h-8 rounded-full bg-zinc-300 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 flex-shrink-0 flex items-center justify-center text-sm font-medium">
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                      </svg>
                     </div>
-                  )
-                ) : message.role === "system" ? (
-                  <div className="w-8 h-8 rounded-full bg-zinc-300 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 flex-shrink-0 flex items-center justify-center text-sm font-medium">
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                    </svg>
-                  </div>
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-[#6c47ff] text-white flex-shrink-0 flex items-center justify-center text-sm font-medium">
-                    FL
-                  </div>
-                )}
-
-                {/* Message Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      {message.role === "user"
-                        ? "You"
-                        : message.role === "system"
-                          ? "System"
-                          : "FileLlama"}
-                    </span>
-                    {isDebugMessage && (
-                      <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                        DEBUG MODE
-                      </span>
-                    )}
-                    <span className="text-xs text-zinc-400 dark:text-zinc-500">
-                      {formatTime(message.createdAt)}
-                    </span>
-                    {/* Debug: Show role */}
-                    {debugMode && isDevelopment && (
-                      <span className="text-xs text-zinc-400 dark:text-zinc-500 font-mono bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">
-                        role: {message.role}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* User-friendly activity indicators - shown to all users */}
-                  {message.role === "assistant" && activities.length > 0 && (
-                    <div className="mb-3 flex flex-wrap gap-2">
-                      {activities.map((activity: any, index: number) => (
-                        <div
-                          key={index}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-900/20 text-xs text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800"
-                        >
-                          {activity.action === "search" && (
-                            <>
-                              <svg
-                                className="w-3 h-3"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                                />
-                              </svg>
-                              <span>Searching for "{activity.details}"</span>
-                            </>
-                          )}
-                          {activity.action === "retrieve" && (
-                            <>
-                              <svg
-                                className="w-3 h-3"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
-                                />
-                              </svg>
-                              <span>Retrieving {activity.details}</span>
-                            </>
-                          )}
-                        </div>
-                      ))}
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-[#6c47ff] text-white flex-shrink-0 flex items-center justify-center text-sm font-medium">
+                      FL
                     </div>
                   )}
 
-                  {/* Debug: Show tool calls before message content */}
-                  {debugMode &&
-                    isDevelopment &&
-                    message.role === "assistant" &&
-                    toolCallDetails.length > 0 && (
-                      <div className="mb-3 space-y-2">
-                        <div className="text-xs font-medium text-amber-600 dark:text-amber-400">
-                          Tool Calls ({toolCallDetails.length}):
-                        </div>
-                        {toolCallDetails.map((toolCall: any, index: number) => (
-                          <details
+                  {/* Message Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                        {message.role === "user"
+                          ? "You"
+                          : message.role === "system"
+                          ? "System"
+                          : "FileLlama"}
+                      </span>
+                      {isDebugMessage && (
+                        <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                          DEBUG MODE
+                        </span>
+                      )}
+                      <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                        {formatTime(message.createdAt)}
+                      </span>
+                      {/* Debug: Show role */}
+                      {debugMode && isDevelopment && (
+                        <span className="text-xs text-zinc-400 dark:text-zinc-500 font-mono bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">
+                          role: {message.role}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* User-friendly activity indicators - shown to all users */}
+                    {message.role === "assistant" && activities.length > 0 && (
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        {activities.map((activity: any, index: number) => (
+                          <div
                             key={index}
-                            className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-lg"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-900/20 text-xs text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800"
                           >
-                            <summary className="px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/20 rounded-lg">
-                              {index + 1}. {toolCall.toolName}
-                              {toolCall.toolName === "search_documents" &&
-                                toolCall.args?.query && (
-                                  <span className="ml-2 font-mono text-amber-600 dark:text-amber-500">
-                                    query: "{toolCall.args.query}"
-                                  </span>
-                                )}
-                              {toolCall.toolName === "get_document" &&
-                                toolCall.args?.documentId && (
-                                  <span className="ml-2 font-mono text-amber-600 dark:text-amber-500">
-                                    documentId:{" "}
-                                    {toolCall.args.documentId.substring(0, 8)}
-                                    ...
-                                  </span>
-                                )}
-                            </summary>
-                            <div className="px-3 pb-3 pt-1 space-y-2">
-                              <div>
-                                <div className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">
-                                  Arguments:
-                                </div>
-                                <pre className="text-xs text-zinc-600 dark:text-zinc-400 bg-white dark:bg-zinc-900 rounded p-2 overflow-x-auto border border-amber-200 dark:border-amber-800">
-                                  {JSON.stringify(toolCall.args, null, 2)}
-                                </pre>
-                              </div>
-                              {toolCall.result && (
-                                <div>
-                                  <div className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">
-                                    Result:
-                                  </div>
-                                  <pre className="text-xs text-zinc-600 dark:text-zinc-400 bg-white dark:bg-zinc-900 rounded p-2 overflow-x-auto border border-amber-200 dark:border-amber-800 max-h-48">
-                                    {JSON.stringify(toolCall.result, null, 2)}
-                                  </pre>
-                                </div>
-                              )}
-                            </div>
-                          </details>
+                            {activity.action === "search" && (
+                              <>
+                                <svg
+                                  className="w-3 h-3"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                                  />
+                                </svg>
+                                <span>Searching for "{activity.details}"</span>
+                              </>
+                            )}
+                            {activity.action === "retrieve" && (
+                              <>
+                                <svg
+                                  className="w-3 h-3"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                                  />
+                                </svg>
+                                <span>Retrieving {activity.details}</span>
+                              </>
+                            )}
+                          </div>
                         ))}
                       </div>
                     )}
 
-                  {message.role === "system" ? (
-                    <div className="text-xs text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-3 font-mono whitespace-pre-wrap border border-zinc-200 dark:border-zinc-700">
-                      {message.content}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-zinc-700 dark:text-zinc-300 prose prose-sm dark:prose-invert max-w-none [&_p]:my-3 [&_ul]:my-3 [&_ol]:my-3 [&_li]:my-1.5">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {message.content}
-                      </ReactMarkdown>
-                    </div>
-                  )}
-
-                  {/* Debug: Show raw metadata */}
-                  {debugMode && isDevelopment && message.metadata && (
-                    <details className="mt-3">
-                      <summary className="text-xs text-zinc-500 dark:text-zinc-400 cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-300 font-medium">
-                        Show raw metadata
-                      </summary>
-                      <pre className="mt-2 text-xs text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-3 overflow-x-auto border border-zinc-200 dark:border-zinc-700">
-                        {message.metadata}
-                      </pre>
-                    </details>
-                  )}
-
-                  {/* Citations */}
-                  {message.role === "assistant" && citations.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {citations.map((citation: any, index: number) => (
-                        <button
-                          key={index}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-                        >
-                          <FileIcon className="w-3 h-3" />
-                          <span>{citation.filename}</span>
-                          {citation.page && (
-                            <span className="text-zinc-400 dark:text-zinc-500">
-                              {citation.page}
-                            </span>
+                    {/* Debug: Show tool calls before message content */}
+                    {debugMode &&
+                      isDevelopment &&
+                      message.role === "assistant" &&
+                      toolCallDetails.length > 0 && (
+                        <div className="mb-3 space-y-2">
+                          <div className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                            Tool Calls ({toolCallDetails.length}):
+                          </div>
+                          {toolCallDetails.map(
+                            (toolCall: any, index: number) => (
+                              <details
+                                key={index}
+                                className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-lg"
+                              >
+                                <summary className="px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/20 rounded-lg">
+                                  {index + 1}. {toolCall.toolName}
+                                  {toolCall.toolName === "search_documents" &&
+                                    toolCall.args?.query && (
+                                      <span className="ml-2 font-mono text-amber-600 dark:text-amber-500">
+                                        query: "{toolCall.args.query}"
+                                      </span>
+                                    )}
+                                  {toolCall.toolName === "get_document" &&
+                                    toolCall.args?.documentId && (
+                                      <span className="ml-2 font-mono text-amber-600 dark:text-amber-500">
+                                        documentId:{" "}
+                                        {toolCall.args.documentId.substring(
+                                          0,
+                                          8
+                                        )}
+                                        ...
+                                      </span>
+                                    )}
+                                </summary>
+                                <div className="px-3 pb-3 pt-1 space-y-2">
+                                  <div>
+                                    <div className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">
+                                      Arguments:
+                                    </div>
+                                    <pre className="text-xs text-zinc-600 dark:text-zinc-400 bg-white dark:bg-zinc-900 rounded p-2 overflow-x-auto border border-amber-200 dark:border-amber-800">
+                                      {JSON.stringify(toolCall.args, null, 2)}
+                                    </pre>
+                                  </div>
+                                  {toolCall.result && (
+                                    <div>
+                                      <div className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">
+                                        Result:
+                                      </div>
+                                      <pre className="text-xs text-zinc-600 dark:text-zinc-400 bg-white dark:bg-zinc-900 rounded p-2 overflow-x-auto border border-amber-200 dark:border-amber-800 max-h-48">
+                                        {JSON.stringify(
+                                          toolCall.result,
+                                          null,
+                                          2
+                                        )}
+                                      </pre>
+                                    </div>
+                                  )}
+                                </div>
+                              </details>
+                            )
                           )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                        </div>
+                      )}
+
+                    {message.role === "system" ? (
+                      <div className="text-xs text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-3 font-mono whitespace-pre-wrap border border-zinc-200 dark:border-zinc-700">
+                        {message.content}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-zinc-700 dark:text-zinc-300 prose prose-sm dark:prose-invert max-w-none [&_p]:my-3 [&_ul]:my-3 [&_ol]:my-3 [&_li]:my-1.5">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {message.content}
+                        </ReactMarkdown>
+                      </div>
+                    )}
+
+                    {/* Debug: Show raw metadata */}
+                    {debugMode && isDevelopment && message.metadata && (
+                      <details className="mt-3">
+                        <summary className="text-xs text-zinc-500 dark:text-zinc-400 cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-300 font-medium">
+                          Show raw metadata
+                        </summary>
+                        <pre className="mt-2 text-xs text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-3 overflow-x-auto border border-zinc-200 dark:border-zinc-700">
+                          {message.metadata}
+                        </pre>
+                      </details>
+                    )}
+
+                    {/* Citations */}
+                    {message.role === "assistant" && citations.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {citations.map((citation: any, index: number) => (
+                          <button
+                            key={index}
+                            onClick={() =>
+                              setSelectedDocumentId(citation.documentId)
+                            }
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                            title="Click to view document"
+                          >
+                            <FileIcon className="w-3 h-3" />
+                            <span>{citation.filename}</span>
+                            {citation.page && (
+                              <span className="text-zinc-400 dark:text-zinc-500">
+                                {citation.page}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
 
-          {/* Typing Indicator */}
-          {isTyping && <TypingIndicator />}
+            {/* Typing Indicator */}
+            {isTyping && <TypingIndicator />}
 
-          {/* Upload Progress */}
-          {uploadingFiles.length > 0 && (
-            <UploadProgress
-              files={uploadingFiles}
-              onCancel={handleCancelUpload}
-            />
-          )}
+            {/* Upload Progress */}
+            {uploadingFiles.length > 0 && (
+              <UploadProgress
+                files={uploadingFiles}
+                onCancel={handleCancelUpload}
+              />
+            )}
 
-          {/* Processing Status */}
-          {processingFiles.length > 0 && (
-            <ProcessingStatus files={processingFiles} />
-          )}
+            {/* Processing Status */}
+            {processingFiles.length > 0 && (
+              <ProcessingStatus files={processingFiles} />
+            )}
 
-          <div ref={messagesEndRef} />
-        </div>
+            <div ref={messagesEndRef} />
+          </div>
 
-        {/* Input Area */}
-        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
-          {/* Error Message */}
-          {error && (
-            <div className="mb-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2">
-              <svg
-                className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <div className="flex-1">
-                <p className="text-sm text-red-800 dark:text-red-200">
-                  {error}
-                </p>
-              </div>
-              <button
-                onClick={() => setError(null)}
-                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
-              >
+          {/* Input Area */}
+          <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+            {/* Error Message */}
+            {error && (
+              <div className="mb-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2">
                 <svg
-                  className="w-4 h-4"
+                  className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -1050,47 +1353,70 @@ export default function ChatPage() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
+                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-              </button>
-            </div>
-          )}
-          <div className="flex items-center gap-3">
-            {/* File Upload Button */}
-            <button
-              className="h-12 w-12 flex items-center justify-center rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors flex-shrink-0"
-              title="Attach files"
-            >
-              <PaperclipIcon className="w-5 h-5" />
-            </button>
-
-            {/* Text Input */}
-            <div className="flex-1 relative">
-              <textarea
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask a question about your documents..."
-                rows={1}
-                className="w-full px-4 py-3 pr-12 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 resize-none focus:outline-none focus:ring-2 focus:ring-[#6c47ff]/50 focus:border-[#6c47ff]"
-                style={{ minHeight: "48px", maxHeight: "120px" }}
-              />
+                <div className="flex-1">
+                  <p className="text-sm text-red-800 dark:text-red-200">
+                    {error}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setError(null)}
+                  className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+            )}
+            <div className="flex items-center gap-3">
+              {/* File Upload Button */}
               <button
-                onClick={handleSendMessage}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-[#6c47ff] text-white hover:bg-[#5a3ad6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!inputValue.trim() || !conversationId || isTyping}
+                className="h-12 w-12 flex items-center justify-center rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors flex-shrink-0"
+                title="Attach files"
               >
-                <SendIcon className="w-4 h-4" />
+                <PaperclipIcon className="w-5 h-5" />
               </button>
+
+              {/* Text Input */}
+              <div className="flex-1 relative">
+                <textarea
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ask a question about your documents..."
+                  rows={1}
+                  className="w-full px-4 py-3 pr-12 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 resize-none focus:outline-none focus:ring-2 focus:ring-[#6c47ff]/50 focus:border-[#6c47ff]"
+                  style={{ minHeight: "48px", maxHeight: "120px" }}
+                />
+                <button
+                  onClick={handleSendMessage}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-[#6c47ff] text-white hover:bg-[#5a3ad6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!inputValue.trim() || !conversationId || isTyping}
+                >
+                  <SendIcon className="w-4 h-4" />
+                </button>
+              </div>
             </div>
+            <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500 text-center">
+              FileLlama can make mistakes. Verify important information in your
+              source documents.
+            </p>
           </div>
-          <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500 text-center">
-            FileLlama can make mistakes. Verify important information in your
-            source documents.
-          </p>
         </div>
-      </div>
-    </DragDropOverlay>
+      </DragDropOverlay>
+    </>
   );
 }

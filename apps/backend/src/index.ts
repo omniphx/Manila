@@ -19,7 +19,7 @@ import { appRouter, type AppRouter } from "./trpc/router.js";
 import { sql, eq } from "drizzle-orm";
 import { extractFileContent } from "./services/file-extraction.js";
 
-const UPLOAD_DIR = join(process.cwd(), 'uploads');
+const UPLOAD_DIR = join(process.cwd(), "uploads");
 
 // Ensure upload directory exists
 await fs.mkdir(UPLOAD_DIR, { recursive: true });
@@ -27,22 +27,22 @@ await fs.mkdir(UPLOAD_DIR, { recursive: true });
 // Allowed MIME types - images and documents only
 const ALLOWED_MIME_TYPES = [
   // Images
-  'image/jpeg',
-  'image/jpg',
-  'image/png',
-  'image/gif',
-  'image/webp',
-  'image/svg+xml',
-  'image/bmp',
-  'image/tiff',
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/svg+xml",
+  "image/bmp",
+  "image/tiff",
   // Documents
-  'application/pdf',
-  'application/msword', // .doc
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-  'text/plain',
-  'text/rtf',
-  'application/rtf',
-  'application/vnd.oasis.opendocument.text', // .odt
+  "application/pdf",
+  "application/msword", // .doc
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+  "text/plain",
+  "text/rtf",
+  "application/rtf",
+  "application/vnd.oasis.opendocument.text", // .odt
 ];
 
 /**
@@ -59,17 +59,21 @@ async function processFileExtraction(
   fileId: string,
   filePath: string,
   mimeType: string,
-  originalFilename: string
+  originalFilename: string,
 ): Promise<void> {
   try {
     // Update status to processing
     await db
       .update(files)
-      .set({ processingStatus: 'processing' })
+      .set({ processingStatus: "processing" })
       .where(eq(files.id, fileId));
 
     // Extract content
-    const result = await extractFileContent(filePath, mimeType, originalFilename);
+    const result = await extractFileContent(
+      filePath,
+      mimeType,
+      originalFilename,
+    );
 
     if (result.success) {
       // Update with extracted content
@@ -77,7 +81,7 @@ async function processFileExtraction(
         .update(files)
         .set({
           extractedContent: result.content,
-          processingStatus: 'completed',
+          processingStatus: "completed",
           processingError: null,
         })
         .where(eq(files.id, fileId));
@@ -86,8 +90,8 @@ async function processFileExtraction(
       await db
         .update(files)
         .set({
-          processingStatus: 'failed',
-          processingError: result.error || 'Unknown error',
+          processingStatus: "failed",
+          processingError: result.error || "Unknown error",
         })
         .where(eq(files.id, fileId));
     }
@@ -96,8 +100,9 @@ async function processFileExtraction(
     await db
       .update(files)
       .set({
-        processingStatus: 'failed',
-        processingError: error instanceof Error ? error.message : 'Unknown error',
+        processingStatus: "failed",
+        processingError:
+          error instanceof Error ? error.message : "Unknown error",
       })
       .where(eq(files.id, fileId));
     throw error;
@@ -156,15 +161,19 @@ async function main() {
         router: appRouter,
         createContext,
         onError({ path, error }) {
-          server.log.error({ err: error, path }, `Error in tRPC handler on path '${path}'`);
+          server.log.error(
+            { err: error, path },
+            `Error in tRPC handler on path '${path}'`,
+          );
         },
       } satisfies FastifyTRPCPluginOptions<AppRouter>["trpcOptions"],
     });
 
-    // File download endpoint
+    // File download/view endpoint
     server.get("/files/:id", async (request, reply) => {
       try {
         const { id } = request.params as { id: string };
+        const { download } = request.query as { download?: string };
 
         // Check authentication
         const auth = getAuth(request as any);
@@ -195,15 +204,22 @@ async function main() {
 
         // Read and send file
         const fileBuffer = await fs.readFile(file.path);
+
+        // Use inline for viewing, attachment for downloading
+        const disposition =
+          download === "true"
+            ? `attachment; filename="${file.originalFilename}"`
+            : `inline; filename="${file.originalFilename}"`;
+
         return reply
-          .header('Content-Type', file.mimeType)
-          .header('Content-Disposition', `attachment; filename="${file.originalFilename}"`)
+          .header("Content-Type", file.mimeType)
+          .header("Content-Disposition", disposition)
           .send(fileBuffer);
       } catch (error) {
         server.log.error(error);
         return reply.code(500).send({
           error: {
-            message: "Failed to download file",
+            message: "Failed to load file",
             statusCode: 500,
           },
         });
@@ -237,9 +253,11 @@ async function main() {
         }
 
         // Get folderId from form fields if provided
-        server.log.info({ fields: data.fields }, 'Upload fields received');
-        const folderId = data.fields.folderId ? String((data.fields.folderId as any).value) : null;
-        server.log.info({ folderId }, 'Parsed folderId');
+        server.log.info({ fields: data.fields }, "Upload fields received");
+        const folderId = data.fields.folderId
+          ? String((data.fields.folderId as any).value)
+          : null;
+        server.log.info({ folderId }, "Parsed folderId");
 
         // Validate file type
         if (!isAllowedMimeType(data.mimetype)) {
@@ -255,17 +273,22 @@ async function main() {
         const buffer = await data.toBuffer();
 
         // Generate content hash for deduplication
-        const contentHash = createHash('sha256').update(buffer).digest('hex');
+        const contentHash = createHash("sha256").update(buffer).digest("hex");
 
         // Check if file with same content already exists for this user
         const [existingFile] = await db
           .select()
           .from(files)
-          .where(sql`${files.userId} = ${auth.userId} AND ${files.contentHash} = ${contentHash}`)
+          .where(
+            sql`${files.userId} = ${auth.userId} AND ${files.contentHash} = ${contentHash}`,
+          )
           .limit(1);
 
         if (existingFile) {
-          server.log.info({ contentHash, existingFileId: existingFile.id }, 'Duplicate file detected');
+          server.log.info(
+            { contentHash, existingFileId: existingFile.id },
+            "Duplicate file detected",
+          );
           return reply.code(409).send({
             error: {
               message: `This file already exists: ${existingFile.originalFilename}`,
@@ -276,7 +299,7 @@ async function main() {
         }
 
         // Generate unique filename
-        const fileExtension = data.filename.split('.').pop() || '';
+        const fileExtension = data.filename.split(".").pop() || "";
         const uniqueFilename = `${randomUUID()}.${fileExtension}`;
         const filePath = join(UPLOAD_DIR, uniqueFilename);
 
@@ -295,13 +318,21 @@ async function main() {
             size: buffer.length.toString(),
             path: filePath,
             contentHash,
-            processingStatus: 'pending',
+            processingStatus: "pending",
           })
           .returning();
 
         // Trigger async extraction (non-blocking)
-        processFileExtraction(newFile.id, filePath, data.mimetype, data.filename).catch((err) => {
-          server.log.error({ err, fileId: newFile.id }, 'Failed to process file extraction');
+        processFileExtraction(
+          newFile.id,
+          filePath,
+          data.mimetype,
+          data.filename,
+        ).catch((err) => {
+          server.log.error(
+            { err, fileId: newFile.id },
+            "Failed to process file extraction",
+          );
         });
 
         return {

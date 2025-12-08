@@ -1,29 +1,31 @@
-import { z } from 'zod';
-import { TRPCError } from '@trpc/server';
-import { router, protectedProcedure } from '../trpc.js';
-import { files } from '../../db/schema.js';
-import { eq } from 'drizzle-orm';
-import { randomUUID } from 'crypto';
-import { promises as fs } from 'fs';
-import { join } from 'path';
-import { pipeline } from 'stream/promises';
+import { z } from "zod";
+import { TRPCError } from "@trpc/server";
+import { router, protectedProcedure } from "../trpc.js";
+import { files } from "../../db/schema.js";
+import { eq } from "drizzle-orm";
+import { randomUUID } from "crypto";
+import { promises as fs } from "fs";
+import { join } from "path";
+import { pipeline } from "stream/promises";
 
-const UPLOAD_DIR = join(process.cwd(), 'uploads');
+const UPLOAD_DIR = join(process.cwd(), "uploads");
 
 // Ensure upload directory exists
 await fs.mkdir(UPLOAD_DIR, { recursive: true });
 
 export const filesRouter = router({
   upload: protectedProcedure
-    .input(z.object({
-      filename: z.string(),
-      mimeType: z.string(),
-      size: z.number(),
-      data: z.instanceof(Buffer),
-    }))
+    .input(
+      z.object({
+        filename: z.string(),
+        mimeType: z.string(),
+        size: z.number(),
+        data: z.instanceof(Buffer),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       // Generate unique filename to avoid collisions
-      const fileExtension = input.filename.split('.').pop() || '';
+      const fileExtension = input.filename.split(".").pop() || "";
       const uniqueFilename = `${randomUUID()}.${fileExtension}`;
       const filePath = join(UPLOAD_DIR, uniqueFilename);
 
@@ -60,8 +62,8 @@ export const filesRouter = router({
           // Ignore cleanup errors
         }
         throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to upload file',
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to upload file",
         });
       }
     }),
@@ -71,7 +73,7 @@ export const filesRouter = router({
       z.object({
         limit: z.number().min(1).max(100).default(20),
         offset: z.number().min(0).default(0),
-      })
+      }),
     )
     .query(async ({ ctx, input }) => {
       const results = await ctx.db
@@ -97,7 +99,12 @@ export const filesRouter = router({
     }),
 
   getById: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        includeContent: z.boolean().optional().default(false),
+      }),
+    )
     .query(async ({ ctx, input }) => {
       const [file] = await ctx.db
         .select()
@@ -107,8 +114,8 @@ export const filesRouter = router({
 
       if (!file || file.userId !== ctx.user.userId) {
         throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'File not found',
+          code: "NOT_FOUND",
+          message: "File not found",
         });
       }
 
@@ -119,6 +126,9 @@ export const filesRouter = router({
         mimeType: file.mimeType,
         size: file.size,
         createdAt: file.createdAt,
+        ...(input.includeContent && {
+          extractedContent: file.extractedContent,
+        }),
       };
     }),
 
@@ -133,8 +143,8 @@ export const filesRouter = router({
 
       if (!file || file.userId !== ctx.user.userId) {
         throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'File not found',
+          code: "NOT_FOUND",
+          message: "File not found",
         });
       }
 
@@ -143,7 +153,7 @@ export const filesRouter = router({
         await fs.unlink(file.path);
       } catch (error) {
         // Log error but continue with database deletion
-        console.error('Failed to delete file from filesystem:', error);
+        console.error("Failed to delete file from filesystem:", error);
       }
 
       // Delete from database
@@ -160,7 +170,7 @@ export const filesRouter = router({
       z.object({
         fileId: z.string().uuid(),
         folderId: z.string().uuid().nullable(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       const [file] = await ctx.db
@@ -171,8 +181,8 @@ export const filesRouter = router({
 
       if (!file || file.userId !== ctx.user.userId) {
         throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'File not found',
+          code: "NOT_FOUND",
+          message: "File not found",
         });
       }
 
