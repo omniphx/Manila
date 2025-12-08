@@ -178,14 +178,19 @@ export const chatRouter = router({
 
       // Fetch mentioned files if any
       let mentionedFilesContext = "";
+      let mentionedFiles: Array<{
+        id: string;
+        originalFilename: string;
+      }> = [];
+
       if (input.fileIds && input.fileIds.length > 0) {
-        const mentionedFiles = await ctx.db
+        const fetchedFiles = await ctx.db
           .select()
           .from(files)
           .where(inArray(files.id, input.fileIds));
 
         // Verify all files belong to the user
-        const unauthorizedFiles = mentionedFiles.filter(
+        const unauthorizedFiles = fetchedFiles.filter(
           (f) => f.userId !== ctx.user.userId,
         );
         if (unauthorizedFiles.length > 0) {
@@ -195,10 +200,16 @@ export const chatRouter = router({
           });
         }
 
+        // Store mentioned files for citation
+        mentionedFiles = fetchedFiles.map((f) => ({
+          id: f.id,
+          originalFilename: f.originalFilename,
+        }));
+
         // Build context from mentioned files
-        if (mentionedFiles.length > 0) {
+        if (fetchedFiles.length > 0) {
           mentionedFilesContext = "\n\n---\n\nReferenced Documents:\n\n";
-          for (const file of mentionedFiles) {
+          for (const file of fetchedFiles) {
             if (file.extractedContent) {
               mentionedFilesContext += `### ${file.originalFilename}\n\n${file.extractedContent}\n\n---\n\n`;
             } else {
@@ -218,6 +229,20 @@ export const chatRouter = router({
         historyForLLM,
       );
 
+      // Add @ mentioned files to citations if they were used
+      const allCitations = [
+        ...chatResult.citations,
+        ...mentionedFiles.map((file) => ({
+          documentId: file.id,
+          filename: file.originalFilename,
+        })),
+      ];
+
+      // Deduplicate citations by documentId
+      const uniqueCitations = Array.from(
+        new Map(allCitations.map((c) => [c.documentId, c])).values(),
+      );
+
       // Save AI response with citations, tool call details, and activities
       const [assistantMessage] = await ctx.db
         .insert(messages)
@@ -226,7 +251,7 @@ export const chatRouter = router({
           role: "assistant",
           content: chatResult.answer,
           metadata: JSON.stringify({
-            citations: chatResult.citations,
+            citations: uniqueCitations,
             toolCalls: chatResult.toolCalls,
             toolCallDetails: chatResult.toolCallDetails,
             activities: chatResult.activities,
