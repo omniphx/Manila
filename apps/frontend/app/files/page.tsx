@@ -5,6 +5,7 @@ import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { toast } from "sonner";
 import { DragDropOverlay } from "../components/DragDropOverlay";
+import { FileViewerModal } from "../components/FileViewerModal";
 import { uploadFile } from "../actions/upload";
 import { useTRPC } from "@/lib/trpc";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -249,6 +250,29 @@ function SettingsIcon({ className }: { className?: string }) {
   );
 }
 
+function EyeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+      />
+    </svg>
+  );
+}
+
 // Helper to get user initials from name
 function getInitials(
   firstName?: string | null,
@@ -321,6 +345,9 @@ export default function FilesPage() {
     new Set()
   );
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
+    null
+  );
   const [isUploading, setIsUploading] = useState(false);
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -861,6 +888,16 @@ export default function FilesPage() {
 
                   {/* Hover Actions */}
                   <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedDocumentId(file.id);
+                      }}
+                      className="p-1.5 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:text-[#6c47ff] transition-colors shadow-sm"
+                      title="View file"
+                    >
+                      <EyeIcon className="w-3.5 h-3.5" />
+                    </button>
                     <button className="p-1.5 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:text-[#6c47ff] transition-colors shadow-sm">
                       <DownloadIcon className="w-3.5 h-3.5" />
                     </button>
@@ -918,6 +955,16 @@ export default function FilesPage() {
                     {formatDate(file.createdAt)}
                   </div>
                   <div className="col-span-1 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedDocumentId(file.id);
+                      }}
+                      className="p-1.5 rounded-md text-zinc-500 hover:text-[#6c47ff] transition-colors"
+                      title="View file"
+                    >
+                      <EyeIcon className="w-4 h-4" />
+                    </button>
                     <button className="p-1.5 rounded-md text-zinc-500 hover:text-[#6c47ff] transition-colors">
                       <DownloadIcon className="w-4 h-4" />
                     </button>
@@ -990,6 +1037,14 @@ export default function FilesPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* File Viewer Modal */}
+      {selectedDocumentId && (
+        <FileViewerModal
+          documentId={selectedDocumentId}
+          onClose={() => setSelectedDocumentId(null)}
+        />
       )}
     </DragDropOverlay>
   );
