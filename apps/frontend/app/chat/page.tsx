@@ -469,7 +469,7 @@ export default function ChatPage() {
             setProcessingFiles((prev) =>
               prev.map((f) =>
                 f.id === processingId
-                  ? { ...f, progress: "Generating embeddings..." }
+                  ? { ...f, progress: "Indexing document..." }
                   : f
               )
             );
