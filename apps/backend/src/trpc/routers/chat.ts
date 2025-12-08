@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../trpc.js";
-import { conversations, messages } from "../../db/schema.js";
-import { eq, desc } from "drizzle-orm";
+import { conversations, messages, files } from "../../db/schema.js";
+import { eq, desc, inArray } from "drizzle-orm";
 import { generateChatWithTools } from "../../services/chat-with-tools.js";
 import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
@@ -111,6 +111,7 @@ export const chatRouter = router({
       z.object({
         conversationId: z.string().uuid(),
         content: z.string().min(1).max(10000),
+        fileIds: z.array(z.string().uuid()).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -175,10 +176,45 @@ export const chatRouter = router({
           content: msg.content,
         }));
 
+      // Fetch mentioned files if any
+      let mentionedFilesContext = "";
+      if (input.fileIds && input.fileIds.length > 0) {
+        const mentionedFiles = await ctx.db
+          .select()
+          .from(files)
+          .where(inArray(files.id, input.fileIds));
+
+        // Verify all files belong to the user
+        const unauthorizedFiles = mentionedFiles.filter(
+          (f) => f.userId !== ctx.user.userId,
+        );
+        if (unauthorizedFiles.length > 0) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You do not have access to one or more mentioned files",
+          });
+        }
+
+        // Build context from mentioned files
+        if (mentionedFiles.length > 0) {
+          mentionedFilesContext = "\n\n---\n\nReferenced Documents:\n\n";
+          for (const file of mentionedFiles) {
+            if (file.extractedContent) {
+              mentionedFilesContext += `### ${file.originalFilename}\n\n${file.extractedContent}\n\n---\n\n`;
+            } else {
+              mentionedFilesContext += `### ${file.originalFilename}\n\n[Document is still being processed or contains no extractable text]\n\n---\n\n`;
+            }
+          }
+        }
+      }
+
+      // Combine user question with mentioned files context
+      const questionWithContext = input.content + mentionedFilesContext;
+
       // Generate AI response using tools for document search/retrieval
       const chatResult = await generateChatWithTools(
         ctx.user.userId,
-        input.content,
+        questionWithContext,
         historyForLLM,
       );
 

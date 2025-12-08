@@ -341,11 +341,10 @@ export default function ChatPage() {
     setError(null);
 
     try {
-      // TODO: Update backend to accept fileIds parameter
       await sendMessage.mutateAsync({
         conversationId,
         content,
-        // fileIds, // Will be added when backend is updated
+        fileIds: fileIds.length > 0 ? fileIds : undefined,
       });
 
       // Refetch messages to get the new user message and AI response
