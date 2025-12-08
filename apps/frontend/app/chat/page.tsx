@@ -259,6 +259,7 @@ export default function ChatPage() {
     null
   );
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useUser();
   const trpc = useTRPC();
 
@@ -525,6 +526,21 @@ export default function ChatPage() {
 
   const handleCancelUpload = (fileId: string) => {
     setUploadingFiles((prev) => prev.filter((f) => f.id !== fileId));
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileInputChange = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      await handleFilesDropped(Array.from(files));
+      // Reset input so the same file can be selected again
+      e.target.value = "";
+    }
   };
 
   return (
@@ -1083,11 +1099,21 @@ export default function ChatPage() {
             <div className="flex items-center gap-3">
               {/* File Upload Button */}
               <button
+                onClick={handleUploadClick}
                 className="h-12 w-12 flex items-center justify-center rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors flex-shrink-0"
                 title="Attach files"
               >
                 <PaperclipIcon className="w-5 h-5" />
               </button>
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                onChange={handleFileInputChange}
+                className="hidden"
+                accept=".pdf,.doc,.docx,.txt,.rtf,.odt,image/*"
+              />
 
               {/* Text Input */}
               <div className="flex-1 relative">
