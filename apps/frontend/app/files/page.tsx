@@ -9,26 +9,9 @@ import { FileViewerModal } from "../components/FileViewerModal";
 import { uploadFile } from "../actions/upload";
 import { useTRPC } from "@/lib/trpc";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getFileIcon, getFileTypeColor } from "../components/FileIcons";
 
 // Icons
-function FileIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.5}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
-      />
-    </svg>
-  );
-}
-
 function FolderIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -328,15 +311,6 @@ function getStatusBadge(status: string) {
   }
 }
 
-function getFileTypeIcon(type: string) {
-  const colors: Record<string, string> = {
-    pdf: "text-red-500",
-    docx: "text-blue-500",
-    xlsx: "text-green-500",
-    txt: "text-zinc-500",
-  };
-  return colors[type] || "text-zinc-500";
-}
 
 export default function FilesPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -559,6 +533,7 @@ export default function FilesPage() {
     id: file.id,
     name: file.originalFilename,
     type: file.mimeType.split("/")[1] || "unknown",
+    mimeType: file.mimeType,
     size: parseInt(file.size),
     folderId: file.folderId,
     processingStatus: file.processingStatus as
@@ -866,9 +841,9 @@ export default function FilesPage() {
                 >
                   {/* File Icon */}
                   <div className="flex justify-center mb-3">
-                    <FileIcon
-                      className={`w-10 h-10 ${getFileTypeIcon(file.type)}`}
-                    />
+                    <div className={getFileTypeColor(file.mimeType)}>
+                      {getFileIcon(file.mimeType, "w-10 h-10")}
+                    </div>
                   </div>
 
                   {/* File Name */}
@@ -936,11 +911,9 @@ export default function FilesPage() {
                   } ${draggedFileId === file.id ? "opacity-50" : ""}`}
                 >
                   <div className="col-span-5 flex items-center gap-3 min-w-0">
-                    <FileIcon
-                      className={`w-5 h-5 flex-shrink-0 ${getFileTypeIcon(
-                        file.type
-                      )}`}
-                    />
+                    <div className={getFileTypeColor(file.mimeType)}>
+                      {getFileIcon(file.mimeType, "w-5 h-5 flex-shrink-0")}
+                    </div>
                     <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
                       {file.name}
                     </span>

@@ -15,6 +15,7 @@ import {
 import { uploadFile } from "../actions/upload";
 import { useTRPC } from "@/lib/trpc";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { getFileIcon } from "../components/FileIcons";
 
 const mockRecentFiles = [
   { id: "f1", name: "Q3-Financial-Report.pdf", type: "pdf" },
@@ -23,103 +24,6 @@ const mockRecentFiles = [
   { id: "f4", name: "Customer-Feedback.txt", type: "txt" },
   { id: "f5", name: "Team-Notes.pdf", type: "pdf" },
 ];
-
-function FileIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.5}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
-      />
-    </svg>
-  );
-}
-
-function PdfIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="currentColor"
-    >
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" opacity="0.3"/>
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
-      <text x="12" y="17" fontSize="8" fontWeight="bold" textAnchor="middle" fill="currentColor">PDF</text>
-    </svg>
-  );
-}
-
-function WordIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="currentColor"
-    >
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" opacity="0.3"/>
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
-      <text x="12" y="16" fontSize="6" fontWeight="bold" textAnchor="middle" fill="currentColor">DOC</text>
-    </svg>
-  );
-}
-
-function TextIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="currentColor"
-    >
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" opacity="0.3"/>
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
-      <path d="M8 12h8M8 14h8M8 16h5" stroke="currentColor" strokeWidth="1" fill="none"/>
-    </svg>
-  );
-}
-
-function ImageIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.5}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"
-      />
-    </svg>
-  );
-}
-
-// Helper to get the appropriate icon based on mime type
-function getFileIcon(mimeType: string, className?: string) {
-  if (mimeType === "application/pdf") {
-    return <PdfIcon className={className} />;
-  } else if (
-    mimeType === "application/msword" ||
-    mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-    mimeType === "application/vnd.oasis.opendocument.text"
-  ) {
-    return <WordIcon className={className} />;
-  } else if (mimeType.startsWith("text/")) {
-    return <TextIcon className={className} />;
-  } else if (mimeType.startsWith("image/")) {
-    return <ImageIcon className={className} />;
-  } else {
-    return <FileIcon className={className} />;
-  }
-}
 
 function ChatIcon({ className }: { className?: string }) {
   return (
@@ -1177,24 +1081,33 @@ export default function ChatPage() {
                     {/* Citations */}
                     {message.role === "assistant" && citations.length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {citations.map((citation: any, index: number) => (
-                          <button
-                            key={index}
-                            onClick={() =>
-                              setSelectedDocumentId(citation.documentId)
-                            }
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
-                            title="Click to view document"
-                          >
-                            <FileIcon className="w-3 h-3" />
-                            <span>{citation.filename}</span>
-                            {citation.page && (
-                              <span className="text-zinc-400 dark:text-zinc-500">
-                                {citation.page}
-                              </span>
-                            )}
-                          </button>
-                        ))}
+                        {citations.map((citation: any, index: number) => {
+                          // Look up the file's mimeType from userFiles
+                          const file = userFiles.find(
+                            (f) => f.id === citation.documentId
+                          );
+                          const mimeType =
+                            file?.mimeType || "application/octet-stream";
+
+                          return (
+                            <button
+                              key={index}
+                              onClick={() =>
+                                setSelectedDocumentId(citation.documentId)
+                              }
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                              title="Click to view document"
+                            >
+                              {getFileIcon(mimeType, "w-3 h-3")}
+                              <span>{citation.filename}</span>
+                              {citation.page && (
+                                <span className="text-zinc-400 dark:text-zinc-500">
+                                  {citation.page}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
