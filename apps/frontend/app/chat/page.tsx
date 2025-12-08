@@ -758,12 +758,6 @@ export default function ChatPage() {
                   Debug {debugMode ? "ON" : "OFF"}
                 </button>
               )}
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {mockRecentFiles.length} files indexed
-                </span>
-                <span className="w-2 h-2 rounded-full bg-green-500"></span>
-              </div>
             </div>
           </div>
 
