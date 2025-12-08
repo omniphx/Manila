@@ -258,8 +258,14 @@ export default function ChatPage() {
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
     null
   );
+  const [mentionedFiles, setMentionedFiles] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionSearchQuery, setMentionSearchQuery] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { user } = useUser();
   const trpc = useTRPC();
 
@@ -290,6 +296,11 @@ export default function ChatPage() {
     )
   );
   const sendMessage = useMutation(trpc.chat.sendMessage.mutationOptions());
+
+  // Fetch user's files for @ mentions
+  const { data: userFiles = [] } = useQuery(
+    trpc.files.list.queryOptions({ limit: 100, offset: 0 })
+  );
 
   // Initialize conversation on mount - load most recent or create new
   useEffect(() => {
@@ -322,14 +333,19 @@ export default function ChatPage() {
     if (!inputValue.trim() || !conversationId) return;
 
     const content = inputValue.trim();
+    const fileIds = mentionedFiles.map((f) => f.id);
+
     setInputValue("");
+    setMentionedFiles([]); // Clear mentioned files after sending
     setIsTyping(true);
     setError(null);
 
     try {
+      // TODO: Update backend to accept fileIds parameter
       await sendMessage.mutateAsync({
         conversationId,
         content,
+        // fileIds, // Will be added when backend is updated
       });
 
       // Refetch messages to get the new user message and AI response
@@ -344,8 +360,14 @@ export default function ChatPage() {
           ? err.message
           : "Failed to send message. Please try again.";
       setError(errorMessage);
-      // Restore the message in case of error
+      // Restore the message and mentioned files in case of error
       setInputValue(content);
+      setMentionedFiles(
+        fileIds.map((id) => ({
+          id,
+          name: userFiles.find((f) => f.id === id)?.originalFilename || "",
+        }))
+      );
     } finally {
       setIsTyping(false);
     }
@@ -542,6 +564,70 @@ export default function ChatPage() {
       e.target.value = "";
     }
   };
+
+  // Handle @ mention input changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setInputValue(value);
+
+    // Check for @ mention
+    const cursorPosition = e.target.selectionStart;
+    const textBeforeCursor = value.substring(0, cursorPosition);
+    const lastAtIndex = textBeforeCursor.lastIndexOf("@");
+
+    if (lastAtIndex !== -1) {
+      const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+      // Only show dropdown if @ is followed by word characters or is empty
+      if (/^[\w\s]*$/.test(textAfterAt) && !textAfterAt.includes(" ")) {
+        setMentionSearchQuery(textAfterAt);
+        setShowMentionDropdown(true);
+      } else {
+        setShowMentionDropdown(false);
+      }
+    } else {
+      setShowMentionDropdown(false);
+    }
+  };
+
+  // Select a file from the mention dropdown
+  const handleSelectMention = (file: { id: string; originalFilename: string }) => {
+    const cursorPosition = textareaRef.current?.selectionStart || 0;
+    const textBeforeCursor = inputValue.substring(0, cursorPosition);
+    const lastAtIndex = textBeforeCursor.lastIndexOf("@");
+
+    if (lastAtIndex !== -1) {
+      // Replace @query with nothing and add file to mentioned files
+      const textBefore = inputValue.substring(0, lastAtIndex);
+      const textAfter = inputValue.substring(cursorPosition);
+      setInputValue(textBefore + textAfter);
+
+      // Add to mentioned files if not already mentioned
+      if (!mentionedFiles.find((f) => f.id === file.id)) {
+        setMentionedFiles((prev) => [
+          ...prev,
+          { id: file.id, name: file.originalFilename },
+        ]);
+      }
+    }
+
+    setShowMentionDropdown(false);
+    setMentionSearchQuery("");
+    textareaRef.current?.focus();
+  };
+
+  // Remove a mentioned file
+  const handleRemoveMention = (fileId: string) => {
+    setMentionedFiles((prev) => prev.filter((f) => f.id !== fileId));
+  };
+
+  // Filter files based on search query
+  const filteredFiles = userFiles
+    .filter((file) =>
+      file.originalFilename
+        .toLowerCase()
+        .includes(mentionSearchQuery.toLowerCase())
+    )
+    .slice(0, 5); // Limit to 5 results
 
   return (
     <>
@@ -1117,15 +1203,79 @@ export default function ChatPage() {
 
               {/* Text Input */}
               <div className="flex-1 relative">
+                {/* Mentioned Files */}
+                {mentionedFiles.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2 px-4">
+                    {mentionedFiles.map((file) => (
+                      <div
+                        key={file.id}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#6c47ff]/10 text-xs text-[#6c47ff] border border-[#6c47ff]/20"
+                      >
+                        <FileIcon className="w-3 h-3" />
+                        <span className="max-w-[200px] truncate">{file.name}</span>
+                        <button
+                          onClick={() => handleRemoveMention(file.id)}
+                          className="hover:text-[#5a3ad6] transition-colors"
+                        >
+                          <svg
+                            className="w-3 h-3"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <textarea
+                  ref={textareaRef}
                   value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
+                  onChange={handleInputChange}
                   onKeyDown={handleKeyDown}
-                  placeholder="Ask a question about your documents..."
+                  placeholder="Ask a question about your documents... (Use @ to mention files)"
                   rows={1}
                   className="w-full px-4 py-3 pr-12 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 resize-none focus:outline-none focus:ring-2 focus:ring-[#6c47ff]/50 focus:border-[#6c47ff]"
                   style={{ minHeight: "48px", maxHeight: "120px" }}
                 />
+
+                {/* @ Mention Dropdown */}
+                {showMentionDropdown && filteredFiles.length > 0 && (
+                  <div className="absolute bottom-full left-0 mb-2 w-full max-w-md bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden z-50">
+                    <div className="max-h-60 overflow-y-auto">
+                      {filteredFiles.map((file) => (
+                        <button
+                          key={file.id}
+                          onClick={() => handleSelectMention(file)}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors text-left"
+                        >
+                          <FileIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
+                              {file.originalFilename}
+                            </p>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                              {(parseInt(file.size) / 1024).toFixed(1)} KB
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="px-4 py-2 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-700">
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                        Press Enter or click to select
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <button
                   onClick={handleSendMessage}
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-[#6c47ff] text-white hover:bg-[#5a3ad6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
