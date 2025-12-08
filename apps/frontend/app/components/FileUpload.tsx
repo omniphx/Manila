@@ -3,7 +3,8 @@
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import { useState } from "react";
 import { uploadFile } from "../actions/upload";
-import { trpc } from "@/lib/trpc";
+import { useTRPC } from "@/lib/trpc";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function FileUpload() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -11,7 +12,8 @@ export function FileUpload() {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string>("");
 
-  const utils = trpc.useUtils();
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -48,7 +50,9 @@ export function FileUpload() {
       setUploadStatus(`File "${result.data.originalFilename}" uploaded successfully!`);
 
       // Invalidate the files list query to trigger a refetch
-      await utils.files.list.invalidate();
+      await queryClient.invalidateQueries({
+        queryKey: trpc.files.list.queryKey(),
+      });
 
       // Reset after 3 seconds
       setTimeout(() => {

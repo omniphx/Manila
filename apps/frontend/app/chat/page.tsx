@@ -42,6 +42,85 @@ function FileIcon({ className }: { className?: string }) {
   );
 }
 
+function PdfIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+    >
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" opacity="0.3"/>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+      <text x="12" y="17" fontSize="8" fontWeight="bold" textAnchor="middle" fill="currentColor">PDF</text>
+    </svg>
+  );
+}
+
+function WordIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+    >
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" opacity="0.3"/>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+      <text x="12" y="16" fontSize="6" fontWeight="bold" textAnchor="middle" fill="currentColor">DOC</text>
+    </svg>
+  );
+}
+
+function TextIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+    >
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" opacity="0.3"/>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+      <path d="M8 12h8M8 14h8M8 16h5" stroke="currentColor" strokeWidth="1" fill="none"/>
+    </svg>
+  );
+}
+
+function ImageIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"
+      />
+    </svg>
+  );
+}
+
+// Helper to get the appropriate icon based on mime type
+function getFileIcon(mimeType: string, className?: string) {
+  if (mimeType === "application/pdf") {
+    return <PdfIcon className={className} />;
+  } else if (
+    mimeType === "application/msword" ||
+    mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    mimeType === "application/vnd.oasis.opendocument.text"
+  ) {
+    return <WordIcon className={className} />;
+  } else if (mimeType.startsWith("text/")) {
+    return <TextIcon className={className} />;
+  } else if (mimeType.startsWith("image/")) {
+    return <ImageIcon className={className} />;
+  } else {
+    return <FileIcon className={className} />;
+  }
+}
+
 function ChatIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -259,7 +338,7 @@ export default function ChatPage() {
     null
   );
   const [mentionedFiles, setMentionedFiles] = useState<
-    Array<{ id: string; name: string }>
+    Array<{ id: string; name: string; mimeType: string }>
   >([]);
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [mentionSearchQuery, setMentionSearchQuery] = useState("");
@@ -362,10 +441,14 @@ export default function ChatPage() {
       // Restore the message and mentioned files in case of error
       setInputValue(content);
       setMentionedFiles(
-        fileIds.map((id) => ({
-          id,
-          name: userFiles.find((f) => f.id === id)?.originalFilename || "",
-        }))
+        fileIds.map((id) => {
+          const file = userFiles.find((f) => f.id === id);
+          return {
+            id,
+            name: file?.originalFilename || "",
+            mimeType: file?.mimeType || "application/octet-stream",
+          };
+        })
       );
     } finally {
       setIsTyping(false);
@@ -589,7 +672,7 @@ export default function ChatPage() {
   };
 
   // Select a file from the mention dropdown
-  const handleSelectMention = (file: { id: string; originalFilename: string }) => {
+  const handleSelectMention = (file: { id: string; originalFilename: string; mimeType: string }) => {
     const cursorPosition = textareaRef.current?.selectionStart || 0;
     const textBeforeCursor = inputValue.substring(0, cursorPosition);
     const lastAtIndex = textBeforeCursor.lastIndexOf("@");
@@ -604,7 +687,7 @@ export default function ChatPage() {
       if (!mentionedFiles.find((f) => f.id === file.id)) {
         setMentionedFiles((prev) => [
           ...prev,
-          { id: file.id, name: file.originalFilename },
+          { id: file.id, name: file.originalFilename, mimeType: file.mimeType },
         ]);
       }
     }
@@ -1201,7 +1284,7 @@ export default function ChatPage() {
                         key={file.id}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#6c47ff]/10 text-xs text-[#6c47ff] border border-[#6c47ff]/20"
                       >
-                        <FileIcon className="w-3 h-3" />
+                        {getFileIcon(file.mimeType, "w-3 h-3")}
                         <span className="max-w-[200px] truncate">{file.name}</span>
                         <button
                           onClick={() => handleRemoveMention(file.id)}
