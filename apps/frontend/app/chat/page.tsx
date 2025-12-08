@@ -1181,27 +1181,18 @@ export default function ChatPage() {
                 </button>
               </div>
             )}
-            <div className="flex items-center gap-3">
-              {/* File Upload Button */}
-              <button
-                onClick={handleUploadClick}
-                className="h-12 w-12 flex items-center justify-center rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors flex-shrink-0"
-                title="Attach files"
-              >
-                <PaperclipIcon className="w-5 h-5" />
-              </button>
-              {/* Hidden file input */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                onChange={handleFileInputChange}
-                className="hidden"
-                accept=".pdf,.doc,.docx,.txt,.rtf,.odt,image/*"
-              />
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={handleFileInputChange}
+              className="hidden"
+              accept=".pdf,.doc,.docx,.txt,.rtf,.odt,image/*"
+            />
 
-              {/* Text Input */}
-              <div className="flex-1 relative">
+            {/* Text Input Container */}
+            <div className="relative">
                 {/* Mentioned Files */}
                 {mentionedFiles.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-2 px-4">
@@ -1235,6 +1226,7 @@ export default function ChatPage() {
                   </div>
                 )}
 
+              <div className="relative group">
                 <textarea
                   ref={textareaRef}
                   value={inputValue}
@@ -1242,9 +1234,28 @@ export default function ChatPage() {
                   onKeyDown={handleKeyDown}
                   placeholder="Ask a question about your documents... (Use @ to mention files)"
                   rows={1}
-                  className="w-full px-4 py-3 pr-12 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 resize-none focus:outline-none focus:ring-2 focus:ring-[#6c47ff]/50 focus:border-[#6c47ff]"
+                  className="w-full px-4 py-3 pr-24 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 resize-none focus:outline-none focus:ring-2 focus:ring-[#6c47ff]/50 focus:border-[#6c47ff]"
                   style={{ minHeight: "48px", maxHeight: "120px" }}
                 />
+
+                {/* Action Buttons - Top Right */}
+                <div className="absolute top-2 right-2 flex items-center gap-2">
+                <button
+                  onClick={handleUploadClick}
+                  className="p-2 text-zinc-500 hover:text-zinc-300 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                  title="Attach files"
+                >
+                  <PaperclipIcon className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={handleSendMessage}
+                  className="p-2 text-zinc-500 hover:text-[#6c47ff] opacity-0 group-hover:opacity-100 transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                  disabled={!inputValue.trim() || !conversationId || isTyping}
+                  title="Send message"
+                >
+                  <SendIcon className="w-5 h-5" />
+                </button>
+              </div>
 
                 {/* @ Mention Dropdown */}
                 {showMentionDropdown && filteredFiles.length > 0 && (
@@ -1275,13 +1286,6 @@ export default function ChatPage() {
                     </div>
                   </div>
                 )}
-                <button
-                  onClick={handleSendMessage}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-[#6c47ff] text-white hover:bg-[#5a3ad6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={!inputValue.trim() || !conversationId || isTyping}
-                >
-                  <SendIcon className="w-4 h-4" />
-                </button>
               </div>
             </div>
             <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500 text-center">
