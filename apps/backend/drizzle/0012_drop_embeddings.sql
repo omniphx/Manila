@@ -1,2 +1,1 @@
--- Drop embeddings table (removing RAG features)
-DROP TABLE IF EXISTS embeddings CASCADE;
+-- Embeddings table was removed from initial migration (never created)
