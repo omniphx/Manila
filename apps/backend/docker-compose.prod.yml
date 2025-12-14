@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: ankane/pgvector:latest
+    image: postgres:17-alpine
     container_name: filellama-postgres
     env_file:
       - .env
@@ -8,11 +8,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-manila}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    # No ports exposed - backend connects via Docker network
+    # This prevents the "Docker bypasses UFW" security issue
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
@@ -26,7 +25,8 @@ services:
     env_file:
       - .env
     ports:
-      - "${PORT:-3000}:3000"
+      # Bind to localhost only - nginx reverse proxy handles external traffic
+      - "127.0.0.1:${PORT:-3000}:3000"
     environment:
       NODE_ENV: production
       PORT: ${PORT:-3000}

@@ -63,6 +63,24 @@ SSH public key: `cat ~/.ssh/id_ed25519.pub`
 
 > Note: Users must log out and back in (or run `newgrp docker`) for group membership to take effect.
 
+### CRITICAL: Docker Bypasses UFW
+
+**Docker manipulates iptables directly and bypasses UFW firewall rules.** Even if UFW blocks a port, Docker's `-p` flag will expose it to the internet anyway.
+
+**Never do this:**
+```yaml
+ports:
+  - "5432:5432"  # Exposed to internet despite UFW!
+```
+
+**Always bind to localhost:**
+```yaml
+ports:
+  - "127.0.0.1:5432:5432"  # Only accessible from host
+```
+
+Or better yet, don't publish database ports at all—use Docker networks for container-to-container communication.
+
 ---
 
 ## 5. Container Registry Authentication
@@ -100,16 +118,21 @@ Copy these files to `/opt/filellama` on the droplet:
 Copy my local docker compose file:
 `scp apps/backend/docker-compose.prod.yml root@<DOCKER_IP_ADDRESS>:/opt/filellama/docker-compose.yml`
 
-Make sure we only expose localhost ports:
+**Verify all port bindings use localhost (see section 4 for why this matters):**
 
-```bash
-ports: - "5432:5432" # WRONG - exposes to internet
-ports: - "127.0.0.1:5432:5432" # CORRECT - localhost only
-```
+```yaml
+# WRONG - exposes to internet (bypasses UFW!)
+ports:
+  - "5432:5432"
+  - "3000:3000"
 
-```bash
-ports: - "3000:3000" # WRONG - exposes to internet
-ports: - "127.0.0.1:3000:3000" # CORRECT - localhost only
+# CORRECT - localhost only, accessed via nginx reverse proxy
+ports:
+  - "127.0.0.1:5432:5432"
+  - "127.0.0.1:3000:3000"
+
+# BEST for databases - no port exposure, use Docker networks
+# (remove ports section entirely, backend connects via service name)
 ```
 
 ### .env
@@ -212,7 +235,14 @@ docker compose logs -f
 - [ ] Containers healthy: `docker compose ps`
 - [ ] HTTPS working: `curl https://api.filellama.ai/health`
 - [ ] Disk space adequate: `df -h` (alert threshold: 80%)
-- [ ] Make sure no database ports are exposed
+- [ ] Database port NOT exposed externally (run from local machine):
+  ```bash
+  nc -zv <DOCKER_IP_ADDRESS> 5432  # Should fail/timeout
+  ```
+- [ ] Only localhost ports bound (run on droplet):
+  ```bash
+  sudo ss -tlnp | grep docker  # All should show 127.0.0.1
+  ```
 
 ---
 

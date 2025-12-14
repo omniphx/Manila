@@ -1,8 +1,8 @@
-import { z } from 'zod';
-import { TRPCError } from '@trpc/server';
-import { router, protectedProcedure } from '../trpc.js';
-import { folders } from '../../db/schema.js';
-import { eq, and, isNull } from 'drizzle-orm';
+import { z } from "zod";
+import { TRPCError } from "@trpc/server";
+import { router, protectedProcedure } from "../trpc.js";
+import { folders, files } from "../../db/schema.js";
+import { eq, and, isNull, inArray } from "drizzle-orm";
 
 export const foldersRouter = router({
   /**
@@ -14,7 +14,7 @@ export const foldersRouter = router({
         name: z.string().min(1).max(255),
         parentId: z.string().uuid().optional(),
         color: z.string().max(50).optional(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       // If parentId is provided, verify it exists and belongs to the user
@@ -23,14 +23,17 @@ export const foldersRouter = router({
           .select()
           .from(folders)
           .where(
-            and(eq(folders.id, input.parentId), eq(folders.userId, ctx.user.userId))
+            and(
+              eq(folders.id, input.parentId),
+              eq(folders.userId, ctx.user.userId),
+            ),
           )
           .limit(1);
 
         if (!parentFolder) {
           throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Parent folder not found',
+            code: "NOT_FOUND",
+            message: "Parent folder not found",
           });
         }
       }
@@ -63,7 +66,7 @@ export const foldersRouter = router({
     .input(
       z.object({
         parentId: z.string().uuid().optional().nullable(),
-      })
+      }),
     )
     .query(async ({ ctx, input }) => {
       // Build the where clause
@@ -71,11 +74,11 @@ export const foldersRouter = router({
         input.parentId === undefined
           ? eq(folders.userId, ctx.user.userId)
           : input.parentId === null
-          ? and(eq(folders.userId, ctx.user.userId), isNull(folders.parentId))
-          : and(
-              eq(folders.userId, ctx.user.userId),
-              eq(folders.parentId, input.parentId)
-            );
+            ? and(eq(folders.userId, ctx.user.userId), isNull(folders.parentId))
+            : and(
+                eq(folders.userId, ctx.user.userId),
+                eq(folders.parentId, input.parentId),
+              );
 
       const results = await ctx.db
         .select({
@@ -103,14 +106,14 @@ export const foldersRouter = router({
         .select()
         .from(folders)
         .where(
-          and(eq(folders.id, input.id), eq(folders.userId, ctx.user.userId))
+          and(eq(folders.id, input.id), eq(folders.userId, ctx.user.userId)),
         )
         .limit(1);
 
       if (!folder) {
         throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Folder not found',
+          code: "NOT_FOUND",
+          message: "Folder not found",
         });
       }
 
@@ -134,7 +137,7 @@ export const foldersRouter = router({
         name: z.string().min(1).max(255).optional(),
         color: z.string().max(50).optional().nullable(),
         parentId: z.string().uuid().optional().nullable(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       // Verify folder exists and belongs to user
@@ -142,14 +145,14 @@ export const foldersRouter = router({
         .select()
         .from(folders)
         .where(
-          and(eq(folders.id, input.id), eq(folders.userId, ctx.user.userId))
+          and(eq(folders.id, input.id), eq(folders.userId, ctx.user.userId)),
         )
         .limit(1);
 
       if (!folder) {
         throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Folder not found',
+          code: "NOT_FOUND",
+          message: "Folder not found",
         });
       }
 
@@ -161,23 +164,23 @@ export const foldersRouter = router({
           .where(
             and(
               eq(folders.id, input.parentId),
-              eq(folders.userId, ctx.user.userId)
-            )
+              eq(folders.userId, ctx.user.userId),
+            ),
           )
           .limit(1);
 
         if (!parentFolder) {
           throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Parent folder not found',
+            code: "NOT_FOUND",
+            message: "Parent folder not found",
           });
         }
 
         // Prevent moving a folder into itself or its descendants
         if (input.parentId === input.id) {
           throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Cannot move a folder into itself',
+            code: "BAD_REQUEST",
+            message: "Cannot move a folder into itself",
           });
         }
       }
@@ -222,14 +225,14 @@ export const foldersRouter = router({
         .select()
         .from(folders)
         .where(
-          and(eq(folders.id, input.id), eq(folders.userId, ctx.user.userId))
+          and(eq(folders.id, input.id), eq(folders.userId, ctx.user.userId)),
         )
         .limit(1);
 
       if (!folder) {
         throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Folder not found',
+          code: "NOT_FOUND",
+          message: "Folder not found",
         });
       }
 
@@ -240,6 +243,90 @@ export const foldersRouter = router({
       return {
         success: true,
         id: input.id,
+      };
+    }),
+
+  /**
+   * Get all files in a folder recursively (including subfolders)
+   */
+  getFilesInFolder: protectedProcedure
+    .input(z.object({ folderId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      // Verify folder exists and belongs to user
+      const [folder] = await ctx.db
+        .select()
+        .from(folders)
+        .where(
+          and(
+            eq(folders.id, input.folderId),
+            eq(folders.userId, ctx.user.userId),
+          ),
+        )
+        .limit(1);
+
+      if (!folder) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Folder not found",
+        });
+      }
+
+      // Recursively get all folder IDs (including the root folder)
+      const getAllFolderIds = async (
+        parentIds: string[],
+      ): Promise<string[]> => {
+        if (parentIds.length === 0) return [];
+
+        const childFolders = await ctx.db
+          .select({ id: folders.id })
+          .from(folders)
+          .where(
+            and(
+              eq(folders.userId, ctx.user.userId),
+              inArray(folders.parentId, parentIds),
+            ),
+          );
+
+        const childIds = childFolders.map((f) => f.id);
+        const descendantIds = await getAllFolderIds(childIds);
+
+        return [...childIds, ...descendantIds];
+      };
+
+      // Get all folder IDs including the root folder and all descendants
+      const allFolderIds = [
+        input.folderId,
+        ...(await getAllFolderIds([input.folderId])),
+      ];
+
+      // Get all files in these folders
+      const folderFiles = await ctx.db
+        .select({
+          id: files.id,
+          folderId: files.folderId,
+          filename: files.filename,
+          originalFilename: files.originalFilename,
+          mimeType: files.mimeType,
+          size: files.size,
+          createdAt: files.createdAt,
+          processingStatus: files.processingStatus,
+        })
+        .from(files)
+        .where(
+          and(
+            eq(files.userId, ctx.user.userId),
+            inArray(files.folderId, allFolderIds),
+          ),
+        )
+        .orderBy(files.originalFilename);
+
+      return {
+        folder: {
+          id: folder.id,
+          name: folder.name,
+        },
+        files: folderFiles,
+        totalFiles: folderFiles.length,
       };
     }),
 });

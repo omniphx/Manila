@@ -13,7 +13,7 @@ import {
   type ProcessingFile,
 } from "../components/ProcessingStatus";
 import { uploadFile } from "../actions/upload";
-import { useTRPC } from "@/lib/trpc";
+import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { getFileIcon } from "../components/FileIcons";
 
@@ -246,11 +246,13 @@ export default function ChatPage() {
   >([]);
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [mentionSearchQuery, setMentionSearchQuery] = useState("");
+  const [isExpandingFolder, setIsExpandingFolder] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { user } = useUser();
   const trpc = useTRPC();
+  const trpcClient = useTRPCClient();
 
   // Check if we're in development mode
   const isDevelopment = process.env.NODE_ENV === "development";
@@ -283,6 +285,11 @@ export default function ChatPage() {
   // Fetch user's files for @ mentions
   const { data: userFiles = [] } = useQuery(
     trpc.files.list.queryOptions({ limit: 100, offset: 0 })
+  );
+
+  // Fetch user's folders for @ mentions
+  const { data: userFolders = [] } = useQuery(
+    trpc.folders.list.queryOptions({ parentId: undefined })
   );
 
   // Initialize conversation on mount - load most recent or create new
@@ -606,6 +613,49 @@ export default function ChatPage() {
     setMentionedFiles((prev) => prev.filter((f) => f.id !== fileId));
   };
 
+  // Select a folder from the mention dropdown - expand to all files recursively
+  const handleSelectFolder = async (folder: { id: string; name: string }) => {
+    const cursorPosition = textareaRef.current?.selectionStart || 0;
+    const textBeforeCursor = inputValue.substring(0, cursorPosition);
+    const lastAtIndex = textBeforeCursor.lastIndexOf("@");
+
+    if (lastAtIndex !== -1) {
+      // Replace @query with nothing
+      const textBefore = inputValue.substring(0, lastAtIndex);
+      const textAfter = inputValue.substring(cursorPosition);
+      setInputValue(textBefore + textAfter);
+    }
+
+    setShowMentionDropdown(false);
+    setMentionSearchQuery("");
+    setIsExpandingFolder(true);
+
+    try {
+      // Fetch all files in the folder recursively
+      const result = await trpcClient.folders.getFilesInFolder.query({
+        folderId: folder.id,
+      });
+
+      // Add all files from the folder to mentioned files (avoid duplicates)
+      const newFiles = result.files
+        .filter((file) => !mentionedFiles.find((f) => f.id === file.id))
+        .map((file) => ({
+          id: file.id,
+          name: file.originalFilename,
+          mimeType: file.mimeType,
+        }));
+
+      if (newFiles.length > 0) {
+        setMentionedFiles((prev) => [...prev, ...newFiles]);
+      }
+    } catch (error) {
+      console.error("Failed to expand folder:", error);
+    } finally {
+      setIsExpandingFolder(false);
+      textareaRef.current?.focus();
+    }
+  };
+
   // Filter files based on search query
   const filteredFiles = userFiles
     .filter((file) =>
@@ -614,6 +664,13 @@ export default function ChatPage() {
         .includes(mentionSearchQuery.toLowerCase())
     )
     .slice(0, 5); // Limit to 5 results
+
+  // Filter folders based on search query
+  const filteredFolders = userFolders
+    .filter((folder) =>
+      folder.name.toLowerCase().includes(mentionSearchQuery.toLowerCase())
+    )
+    .slice(0, 3); // Limit to 3 results for folders
 
   return (
     <>
@@ -1254,30 +1311,67 @@ export default function ChatPage() {
               </div>
 
                 {/* @ Mention Dropdown */}
-                {showMentionDropdown && filteredFiles.length > 0 && (
+                {showMentionDropdown && (filteredFiles.length > 0 || filteredFolders.length > 0) && (
                   <div className="absolute bottom-full left-0 mb-2 w-full max-w-md bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden z-50">
                     <div className="max-h-60 overflow-y-auto">
-                      {filteredFiles.map((file) => (
-                        <button
-                          key={file.id}
-                          onClick={() => handleSelectMention(file)}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors text-left"
-                        >
-                          <FileIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
-                              {file.originalFilename}
-                            </p>
-                            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                              {(parseInt(file.size) / 1024).toFixed(1)} KB
+                      {/* Folders section */}
+                      {filteredFolders.length > 0 && (
+                        <>
+                          <div className="px-4 py-1.5 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-700">
+                            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+                              Folders
                             </p>
                           </div>
-                        </button>
-                      ))}
+                          {filteredFolders.map((folder) => (
+                            <button
+                              key={folder.id}
+                              onClick={() => handleSelectFolder(folder)}
+                              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors text-left"
+                            >
+                              <FolderIcon className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
+                                  {folder.name}
+                                </p>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                  Include all files in folder
+                                </p>
+                              </div>
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      {/* Files section */}
+                      {filteredFiles.length > 0 && (
+                        <>
+                          <div className="px-4 py-1.5 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-700">
+                            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+                              Files
+                            </p>
+                          </div>
+                          {filteredFiles.map((file) => (
+                            <button
+                              key={file.id}
+                              onClick={() => handleSelectMention(file)}
+                              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors text-left"
+                            >
+                              {getFileIcon(file.mimeType, "w-4 h-4 flex-shrink-0")}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
+                                  {file.originalFilename}
+                                </p>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                  {(parseInt(file.size) / 1024).toFixed(1)} KB
+                                </p>
+                              </div>
+                            </button>
+                          ))}
+                        </>
+                      )}
                     </div>
                     <div className="px-4 py-2 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-700">
                       <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                        Press Enter or click to select
+                        {isExpandingFolder ? "Loading folder contents..." : "Press Enter or click to select"}
                       </p>
                     </div>
                   </div>
