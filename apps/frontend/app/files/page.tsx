@@ -382,6 +382,10 @@ export default function FilesPage() {
         await queryClient.invalidateQueries({
           queryKey: trpc.folders.list.queryKey(),
         });
+        // Expand the parent folder so the new child is visible in the tree
+        if (newFolder.parentId) {
+          setExpandedFolders((prev) => new Set([...prev, newFolder.parentId!]));
+        }
         setSelectedFolder(newFolder.id);
         setShowNewFolderModal(false);
         setNewFolderName("");
