@@ -15,10 +15,21 @@ export async function uploadFile(formData: FormData, folderId?: string | null) {
       };
     }
 
-    // Add folderId to FormData if provided
-    if (folderId) {
-      formData.append("folderId", folderId);
+    // Rebuild FormData with folderId BEFORE the file
+    // Fastify multipart requires fields to appear before the file in the stream
+    const file = formData.get("file");
+    if (!file) {
+      return {
+        success: false,
+        error: "No file provided",
+      };
     }
+
+    const newFormData = new FormData();
+    if (folderId) {
+      newFormData.append("folderId", folderId);
+    }
+    newFormData.append("file", file);
 
     // Forward the file to the backend
     // Server Actions run server-side, so we need to call the backend API directly
@@ -30,7 +41,7 @@ export async function uploadFile(formData: FormData, folderId?: string | null) {
       headers: {
         Authorization: `Bearer ${token}`,
       },
-      body: formData,
+      body: newFormData,
     });
 
     if (!response.ok) {
