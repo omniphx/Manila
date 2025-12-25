@@ -27,20 +27,148 @@ SSH public key: `cat ~/.ssh/id_ed25519.pub`
 
 ## 2. Verify Access
 
-- Test SSH and sudo for both users
-- Continue remaining steps as `agent` (important before disabling root access)
+⚠️ **CRITICAL: Complete ALL verification before proceeding to security hardening.**
+
+- [ ] Test SSH as `marty`: `ssh marty@<DOCKER_IP_ADDRESS>`
+- [ ] Test SSH as `agent`: `ssh agent@<DOCKER_IP_ADDRESS>`
+- [ ] Verify sudo works for marty: `sudo whoami` (should return `root`)
+- [ ] Verify sudo works for agent: `sudo whoami` (should return `root`)
+
+**Keep your current root session open until ALL of step 3 is complete and verified.**
+
+Continue remaining steps as `agent`.
 
 ---
 
 ## 3. Security Hardening
 
-- Disable root SSH login
-- Disable password authentication (SSH key only)
-- Configure UFW firewall (allow SSH, HTTP, HTTPS)
-- Set up fail2ban for brute force protection
-- Configure automatic security updates
-- X11 Forwarding Enabled
-- Set SSH max auth tries to 3
+⚠️ **LOCKOUT PREVENTION: Follow these steps IN EXACT ORDER. Do not skip ahead.**
+
+### 3.1 Configure UFW Firewall (DO THIS FIRST!)
+
+```bash
+# Allow SSH BEFORE enabling the firewall
+sudo ufw allow OpenSSH
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+
+# Verify rules are added (firewall not yet active)
+sudo ufw status numbered
+
+# Only NOW enable the firewall
+sudo ufw enable
+
+# Confirm SSH is allowed
+sudo ufw status verbose
+```
+
+**Expected output should show:**
+
+```
+22/tcp (OpenSSH)            ALLOW IN    Anywhere
+80/tcp                      ALLOW IN    Anywhere
+443/tcp                     ALLOW IN    Anywhere
+```
+
+🛑 **STOP AND VERIFY**: Open a NEW terminal and confirm you can still SSH in:
+
+```bash
+ssh agent@<DOCKER_IP_ADDRESS>
+```
+
+If this fails, you still have your original session to fix it.
+
+### 3.2 Configure SSH Hardening
+
+**Only proceed after verifying UFW allows SSH.**
+
+Edit `/etc/ssh/sshd_config` with these settings:
+
+```bash
+sudo nano /etc/ssh/sshd_config
+```
+
+```
+PermitRootLogin no
+PasswordAuthentication no
+X11Forwarding yes
+MaxAuthTries 3
+```
+
+**Before restarting SSH, validate the config:**
+
+```bash
+sudo sshd -t
+```
+
+If validation passes (no output = success), restart SSH:
+
+```bash
+sudo systemctl restart sshd
+```
+
+🛑 **STOP AND VERIFY**: In a NEW terminal (keep current session open!):
+
+```bash
+# Should succeed
+ssh agent@<DOCKER_IP_ADDRESS>
+
+# Should fail with "Permission denied (publickey)"
+ssh root@<DOCKER_IP_ADDRESS>
+
+# Should fail (password auth disabled)
+ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no agent@<DOCKER_IP_ADDRESS>
+```
+
+### 3.3 Install and Configure fail2ban
+
+```bash
+sudo apt update
+sudo apt install -y fail2ban
+
+# Create local config (don't edit the main config)
+sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+sudo nano /etc/fail2ban/jail.local
+```
+
+In `[sshd]` section, ensure:
+
+```
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+maxretry = 5
+bantime = 3600
+```
+
+```bash
+sudo systemctl enable fail2ban
+sudo systemctl start fail2ban
+sudo fail2ban-client status sshd
+```
+
+### 3.4 Configure Automatic Security Updates
+
+```bash
+sudo apt install -y unattended-upgrades
+sudo dpkg-reconfigure -plow unattended-upgrades
+```
+
+### 3.5 Final Security Verification
+
+Run all checks before proceeding:
+
+```bash
+# UFW is active and allows SSH
+sudo ufw status verbose | grep -E "(22|OpenSSH)"
+
+# SSH config is valid
+sudo sshd -t && echo "SSH config OK"
+
+# fail2ban is protecting SSH
+sudo fail2ban-client status sshd
+```
 
 ---
 
@@ -68,15 +196,17 @@ SSH public key: `cat ~/.ssh/id_ed25519.pub`
 **Docker manipulates iptables directly and bypasses UFW firewall rules.** Even if UFW blocks a port, Docker's `-p` flag will expose it to the internet anyway.
 
 **Never do this:**
+
 ```yaml
 ports:
-  - "5432:5432"  # Exposed to internet despite UFW!
+  - "5432:5432" # Exposed to internet despite UFW!
 ```
 
 **Always bind to localhost:**
+
 ```yaml
 ports:
-  - "127.0.0.1:5432:5432"  # Only accessible from host
+  - "127.0.0.1:5432:5432" # Only accessible from host
 ```
 
 Or better yet, don't publish database ports at all—use Docker networks for container-to-container communication.
@@ -116,7 +246,7 @@ Copy these files to `/opt/filellama` on the droplet:
 ### docker-compose.yml
 
 Copy my local docker compose file:
-`scp apps/backend/docker-compose.prod.yml root@<DOCKER_IP_ADDRESS>:/opt/filellama/docker-compose.yml`
+`scp apps/backend/docker-compose.prod.yml agent@<DOCKER_IP_ADDRESS>:/opt/filellama/docker-compose.yml`
 
 **Verify all port bindings use localhost (see section 4 for why this matters):**
 
@@ -138,7 +268,7 @@ ports:
 ### .env
 
 Copy my local .env file:
-`scp apps/backend/.env root@<DOCKER_IP_ADDRESS>:/opt/filellama/.env`
+`scp apps/backend/.env agent@<DOCKER_IP_ADDRESS>:/opt/filellama/.env`
 
 Changed the production .env to use the Docker service name:
 `DATABASE_URL=postgresql://postgres:postgres@postgres:5432/manila`
@@ -224,6 +354,10 @@ docker compose logs -f
 
 ---
 
+### Migrate any database changes
+
+cd /opt/filellama/apps/backend && pnpm db:migrate
+
 ## 11. Verification Checklist
 
 - [ ] SSH works for both `marty` and `agent`
@@ -236,10 +370,13 @@ docker compose logs -f
 - [ ] HTTPS working: `curl https://api.filellama.ai/health`
 - [ ] Disk space adequate: `df -h` (alert threshold: 80%)
 - [ ] Database port NOT exposed externally (run from local machine):
+
   ```bash
   nc -zv <DOCKER_IP_ADDRESS> 5432  # Should fail/timeout
   ```
+
 - [ ] Only localhost ports bound (run on droplet):
+
   ```bash
   sudo ss -tlnp | grep docker  # All should show 127.0.0.1
   ```
