@@ -378,10 +378,11 @@ export default function FilesPage() {
   // Create folder mutation
   const createFolderMutation = useMutation(
     trpc.folders.create.mutationOptions({
-      onSuccess: async () => {
+      onSuccess: async (newFolder) => {
         await queryClient.invalidateQueries({
           queryKey: trpc.folders.list.queryKey(),
         });
+        setSelectedFolder(newFolder.id);
         setShowNewFolderModal(false);
         setNewFolderName("");
       },
