@@ -59,6 +59,26 @@ Notes:
 - Build cache will accumulate with each deployment
 - Monitor disk usage periodically to avoid running out of space
 
+## Verification Checklist
+
+- [ ] Firewall active: `sudo ufw status verbose`
+- [ ] Fail2ban running: `sudo fail2ban-client status sshd`
+- [ ] Docker runs without sudo: `docker ps`
+- [ ] Containers healthy: `docker compose ps`
+- [ ] HTTPS working: `curl https://api.filellama.ai/health`
+- [ ] Disk space adequate: `df -h` (alert threshold: 80%)
+- [ ] Database port NOT exposed externally (run from local machine):
+
+  ```bash
+  nc -zv <DOCKER_IP_ADDRESS> 5432  # Should fail/timeout
+  ```
+
+- [ ] Only localhost ports bound (run on droplet):
+
+  ```bash
+  sudo ss -tlnp | grep docker  # All should show 127.0.0.1
+  ```
+
 If anything fails, report the error and ask the user for next steps. Do not try to fix the error or make code changes.
 
 $ARGUMENTS

@@ -1,1 +1,0 @@
--- Embeddings table was removed from initial migration (never created)

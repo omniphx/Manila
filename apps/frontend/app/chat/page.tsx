@@ -1,21 +1,21 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useTRPC, useTRPCClient } from "@/lib/trpc";
 import { useUser } from "@clerk/nextjs";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { uploadFile } from "../actions/upload";
 import { DragDropOverlay } from "../components/DragDropOverlay";
+import { getFileIcon } from "../components/FileIcons";
 import { FileViewerModal } from "../components/FileViewerModal";
-import { UploadProgress, type UploadFile } from "../components/UploadProgress";
 import {
   ProcessingStatus,
   type ProcessingFile,
 } from "../components/ProcessingStatus";
-import { uploadFile } from "../actions/upload";
-import { useTRPC, useTRPCClient } from "@/lib/trpc";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { getFileIcon } from "../components/FileIcons";
+import { UploadProgress, type UploadFile } from "../components/UploadProgress";
 
 const mockRecentFiles = [
   { id: "f1", name: "Q3-Financial-Report.pdf", type: "pdf" },
@@ -583,7 +583,11 @@ export default function ChatPage() {
   };
 
   // Select a file from the mention dropdown
-  const handleSelectMention = (file: { id: string; originalFilename: string; mimeType: string }) => {
+  const handleSelectMention = (file: {
+    id: string;
+    originalFilename: string;
+    mimeType: string;
+  }) => {
     const cursorPosition = textareaRef.current?.selectionStart || 0;
     const textBeforeCursor = inputValue.substring(0, cursorPosition);
     const lastAtIndex = textBeforeCursor.lastIndexOf("@");
@@ -1246,38 +1250,40 @@ export default function ChatPage() {
 
             {/* Text Input Container */}
             <div className="relative">
-                {/* Mentioned Files */}
-                {mentionedFiles.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-2 px-4">
-                    {mentionedFiles.map((file) => (
-                      <div
-                        key={file.id}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#6c47ff]/10 text-xs text-[#6c47ff] border border-[#6c47ff]/20"
+              {/* Mentioned Files */}
+              {mentionedFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2 px-4">
+                  {mentionedFiles.map((file) => (
+                    <div
+                      key={file.id}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#6c47ff]/10 text-xs text-[#6c47ff] border border-[#6c47ff]/20"
+                    >
+                      {getFileIcon(file.mimeType, "w-3 h-3")}
+                      <span className="max-w-[200px] truncate">
+                        {file.name}
+                      </span>
+                      <button
+                        onClick={() => handleRemoveMention(file.id)}
+                        className="hover:text-[#5a3ad6] transition-colors"
                       >
-                        {getFileIcon(file.mimeType, "w-3 h-3")}
-                        <span className="max-w-[200px] truncate">{file.name}</span>
-                        <button
-                          onClick={() => handleRemoveMention(file.id)}
-                          className="hover:text-[#5a3ad6] transition-colors"
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
                         >
-                          <svg
-                            className="w-3 h-3"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div className="relative group">
                 <textarea
@@ -1293,89 +1299,95 @@ export default function ChatPage() {
 
                 {/* Action Buttons - Top Right */}
                 <div className="absolute top-2 right-2 flex items-center gap-2">
-                <button
-                  onClick={handleUploadClick}
-                  className="p-2 text-zinc-500 hover:text-zinc-300 opacity-0 group-hover:opacity-100 transition-all duration-200"
-                  title="Attach files"
-                >
-                  <PaperclipIcon className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={handleSendMessage}
-                  className="p-2 text-zinc-500 hover:text-[#6c47ff] opacity-0 group-hover:opacity-100 transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
-                  disabled={!inputValue.trim() || !conversationId || isTyping}
-                  title="Send message"
-                >
-                  <SendIcon className="w-5 h-5" />
-                </button>
-              </div>
+                  <button
+                    onClick={handleUploadClick}
+                    className="p-2 text-zinc-500 hover:text-zinc-300 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                    title="Attach files"
+                  >
+                    <PaperclipIcon className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={handleSendMessage}
+                    className="p-2 text-zinc-500 hover:text-[#6c47ff] opacity-0 group-hover:opacity-100 transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                    disabled={!inputValue.trim() || !conversationId || isTyping}
+                    title="Send message"
+                  >
+                    <SendIcon className="w-5 h-5" />
+                  </button>
+                </div>
 
                 {/* @ Mention Dropdown */}
-                {showMentionDropdown && (filteredFiles.length > 0 || filteredFolders.length > 0) && (
-                  <div className="absolute bottom-full left-0 mb-2 w-full max-w-md bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden z-50">
-                    <div className="max-h-60 overflow-y-auto">
-                      {/* Folders section */}
-                      {filteredFolders.length > 0 && (
-                        <>
-                          <div className="px-4 py-1.5 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-700">
-                            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
-                              Folders
-                            </p>
-                          </div>
-                          {filteredFolders.map((folder) => (
-                            <button
-                              key={folder.id}
-                              onClick={() => handleSelectFolder(folder)}
-                              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors text-left"
-                            >
-                              <FolderIcon className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
-                                  {folder.name}
-                                </p>
-                                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                                  Include all files in folder
-                                </p>
-                              </div>
-                            </button>
-                          ))}
-                        </>
-                      )}
-                      {/* Files section */}
-                      {filteredFiles.length > 0 && (
-                        <>
-                          <div className="px-4 py-1.5 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-700">
-                            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
-                              Files
-                            </p>
-                          </div>
-                          {filteredFiles.map((file) => (
-                            <button
-                              key={file.id}
-                              onClick={() => handleSelectMention(file)}
-                              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors text-left"
-                            >
-                              {getFileIcon(file.mimeType, "w-4 h-4 flex-shrink-0")}
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
-                                  {file.originalFilename}
-                                </p>
-                                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                                  {(parseInt(file.size) / 1024).toFixed(1)} KB
-                                </p>
-                              </div>
-                            </button>
-                          ))}
-                        </>
-                      )}
+                {showMentionDropdown &&
+                  (filteredFiles.length > 0 || filteredFolders.length > 0) && (
+                    <div className="absolute bottom-full left-0 mb-2 w-full max-w-md bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden z-50">
+                      <div className="max-h-60 overflow-y-auto">
+                        {/* Folders section */}
+                        {filteredFolders.length > 0 && (
+                          <>
+                            <div className="px-4 py-1.5 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-700">
+                              <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+                                Folders
+                              </p>
+                            </div>
+                            {filteredFolders.map((folder) => (
+                              <button
+                                key={folder.id}
+                                onClick={() => handleSelectFolder(folder)}
+                                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors text-left"
+                              >
+                                <FolderIcon className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
+                                    {folder.name}
+                                  </p>
+                                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                    Include all files in folder
+                                  </p>
+                                </div>
+                              </button>
+                            ))}
+                          </>
+                        )}
+                        {/* Files section */}
+                        {filteredFiles.length > 0 && (
+                          <>
+                            <div className="px-4 py-1.5 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-700">
+                              <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+                                Files
+                              </p>
+                            </div>
+                            {filteredFiles.map((file) => (
+                              <button
+                                key={file.id}
+                                onClick={() => handleSelectMention(file)}
+                                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors text-left"
+                              >
+                                {getFileIcon(
+                                  file.mimeType,
+                                  "w-4 h-4 flex-shrink-0"
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
+                                    {file.originalFilename}
+                                  </p>
+                                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                    {(parseInt(file.size) / 1024).toFixed(1)} KB
+                                  </p>
+                                </div>
+                              </button>
+                            ))}
+                          </>
+                        )}
+                      </div>
+                      <div className="px-4 py-2 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-700">
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                          {isExpandingFolder
+                            ? "Loading folder contents..."
+                            : "Press Enter or click to select"}
+                        </p>
+                      </div>
                     </div>
-                    <div className="px-4 py-2 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-700">
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                        {isExpandingFolder ? "Loading folder contents..." : "Press Enter or click to select"}
-                      </p>
-                    </div>
-                  </div>
-                )}
+                  )}
               </div>
             </div>
             <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500 text-center">
